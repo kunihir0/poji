@@ -27,6 +27,7 @@ namespace poji
         // Crosshair info structure
         public class CrosshairInfo
         {
+            // Original properties with raw values
             public CrosshairStyle Style { get; set; }
             public bool HasCenterDot { get; set; }
             public float Length { get; set; }
@@ -44,6 +45,13 @@ namespace poji
             public float OuterSplitAlpha { get; set; }
             public float SplitSizeRatio { get; set; }
             public bool IsTStyle { get; set; }
+            
+            // Scale factor for display purposes
+            public float ScaleFactor { get; set; } = 1.0f;
+
+            // Raw values for debugging and exact representation
+            public byte[] RawData { get; set; }
+            public string ShareCode { get; set; }
 
             // Method to generate console commands for CS:GO
             public string ToConsoleCommands()
@@ -71,6 +79,42 @@ namespace poji
             public Color GetColor()
             {
                 return Color.FromArgb(Alpha, Red, Green, Blue);
+            }
+            
+            // Get outline color (typically black with same alpha)
+            public Color GetOutlineColor()
+            {
+                return Color.FromArgb(Alpha, 0, 0, 0);
+            }
+            
+            // Get scaled length for display
+            public float GetScaledLength()
+            {
+                return Length * ScaleFactor;
+            }
+            
+            // Get scaled thickness for display
+            public float GetScaledThickness()
+            {
+                return Thickness * ScaleFactor;
+            }
+            
+            // Get scaled gap for display
+            public float GetScaledGap()
+            {
+                return Gap * ScaleFactor;
+            }
+            
+            // Get scaled outline thickness for display
+            public float GetScaledOutline()
+            {
+                return Outline * ScaleFactor;
+            }
+            
+            // Clone method for creating copies with different scale factors
+            public CrosshairInfo Clone()
+            {
+                return (CrosshairInfo)this.MemberwiseClone();
             }
         }
 
@@ -116,7 +160,7 @@ namespace poji
                 int pos = DICTIONARY.IndexOf(c);
                 if (pos == -1)
                 {
-                    throw new ArgumentException("Invalid character in share code");
+                    throw new ArgumentException($"Invalid character '{c}' in share code");
                 }
                 big = big * baseNum + pos;
             }
@@ -130,7 +174,7 @@ namespace poji
             }
 
             // Add padding if needed
-            if (bytes.Count == 18)
+            while (bytes.Count < 19)
             {
                 bytes.Add(0);
             }
@@ -141,7 +185,7 @@ namespace poji
         }
 
         // Decode crosshair info from byte array
-        public CrosshairInfo DecodeCrosshairInfo(byte[] bytes)
+        public CrosshairInfo DecodeCrosshairInfo(byte[] bytes, string originalShareCode = null)
         {
             if (bytes.Length < 16)
             {
@@ -150,7 +194,11 @@ namespace poji
 
             var info = new CrosshairInfo
             {
-                // Decode values
+                // Store raw data for debugging
+                RawData = bytes,
+                ShareCode = originalShareCode,
+                
+                // Decode values without clamping
                 Outline = bytes[4] / 2.0f,
                 Red = bytes[5],
                 Green = bytes[6],
@@ -175,15 +223,23 @@ namespace poji
             // Get style
             int styleValue = (bytes[14] & 0xF) >> 1;
             info.Style = (CrosshairStyle)styleValue;
-
+            
+            // Ensure valid ranges for display
+            if (info.Alpha <= 0) info.Alpha = 255;
+            if (info.Red < 0 || info.Red > 255) info.Red = info.Red < 0 ? 0 : 255;
+            if (info.Green < 0 || info.Green > 255) info.Green = info.Green < 0 ? 0 : 255;
+            if (info.Blue < 0 || info.Blue > 255) info.Blue = info.Blue < 0 ? 0 : 255;
+            
+            // Return without clamping other values to allow for extreme crosshairs
             return info;
         }
 
-        // Format crosshair info as JSON string
+        // Format crosshair info as JSON string with raw data for debugging
         public string CrosshairInfoToJson(CrosshairInfo info)
         {
             var sb = new StringBuilder();
             sb.AppendLine("{");
+            sb.AppendLine($"  \"shareCode\": \"{info.ShareCode}\",");
             sb.AppendLine($"  \"style\": \"{StyleToString(info.Style)}\",");
             sb.AppendLine($"  \"hasCenterDot\": {info.HasCenterDot.ToString().ToLower()},");
             sb.AppendLine($"  \"length\": {info.Length},");
@@ -203,9 +259,33 @@ namespace poji
             sb.AppendLine($"  \"innerSplitAlpha\": {info.InnerSplitAlpha},");
             sb.AppendLine($"  \"outerSplitAlpha\": {info.OuterSplitAlpha},");
             sb.AppendLine($"  \"splitSizeRatio\": {info.SplitSizeRatio},");
-            sb.AppendLine($"  \"isTStyle\": {info.IsTStyle.ToString().ToLower()}");
+            sb.AppendLine($"  \"isTStyle\": {info.IsTStyle.ToString().ToLower()},");
+            
+            // Add raw data for debugging
+            if (info.RawData != null)
+            {
+                sb.Append("  \"rawData\": [");
+                for (int i = 0; i < info.RawData.Length; i++)
+                {
+                    sb.Append(info.RawData[i]);
+                    if (i < info.RawData.Length - 1) sb.Append(", ");
+                }
+                sb.AppendLine("]");
+            }
+            else
+            {
+                sb.AppendLine("  \"rawData\": null");
+            }
+            
             sb.AppendLine("}");
             return sb.ToString();
+        }
+        
+        // Method to decode a share code directly to CrosshairInfo
+        public CrosshairInfo DecodeShareCodeToCrosshairInfo(string shareCode)
+        {
+            byte[] bytes = DecodeShareCode(shareCode);
+            return DecodeCrosshairInfo(bytes, shareCode);
         }
     }
 }

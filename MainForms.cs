@@ -14,11 +14,20 @@ namespace poji
         private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
         [DllImport("user32.dll")]
         private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-
+        
+        // For multi-monitor support
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+        
         // Constants for window styles
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_LAYERED = 0x80000;
         private const int WS_EX_TRANSPARENT = 0x20;
+        
+        // SetWindowPos constants
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private const uint SWP_NOACTIVATE = 0x0010;
+        private const uint SWP_SHOWWINDOW = 0x0040;
 
         // System tray components
         private NotifyIcon trayIcon;
@@ -32,24 +41,17 @@ namespace poji
         private bool useCustomCrosshair = false;
         private Color dotColor = Color.Red;
         private int dotSize = 10;
+        
+        // Configuration settings
+        private int currentMonitorIndex = 0;
+        private bool isVisible = true;
+        private float scaleFactor = 1.0f;
 
         public MainForm()
         {
-            InitializeComponent();
             InitializeForm();
             InitializeTrayIcon();
             SetupHotkey();
-        }
-
-        private void InitializeComponent()
-        {
-            this.SuspendLayout();
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 450);
-            this.Name = "MainForm";
-            this.Text = "Crosshair Overlay";
-            this.ResumeLayout(false);
         }
 
         private void InitializeForm()
@@ -60,27 +62,63 @@ namespace poji
             this.ShowInTaskbar = false;
             this.DoubleBuffered = true;
 
-            // Set form to cover entire primary screen
-            this.Bounds = Screen.PrimaryScreen.Bounds;
-            this.Location = new Point(0, 0);
+            // Cover the entire primary screen initially
+            SetFormToScreen(Screen.PrimaryScreen);
 
             // Make the form background completely transparent
-            this.BackColor = Color.LimeGreen; // Use a color that's not in your UI
+            this.BackColor = Color.LimeGreen; // Use a color not present in your UI
             this.TransparencyKey = Color.LimeGreen;
 
-            // Set window styles for click-through
+            // Set window styles for click-through (layered + transparent)
             int exStyle = GetWindowLong(this.Handle, GWL_EXSTYLE);
             exStyle |= WS_EX_LAYERED | WS_EX_TRANSPARENT;
             SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle);
+            
+            // Ensure the form stays on top
+            SetWindowPos(this.Handle, HWND_TOPMOST, this.Left, this.Top, this.Width, this.Height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        }
+        
+        private void SetFormToScreen(Screen screen)
+        {
+            // Set form size to cover the entire screen
+            this.Bounds = screen.Bounds;
+            this.Location = new Point(screen.Bounds.X, screen.Bounds.Y);
+            this.Size = new Size(screen.Bounds.Width, screen.Bounds.Height);
+            
+            // Force redraw
+            this.Invalidate();
         }
 
         private void InitializeTrayIcon()
         {
             trayMenu = new ContextMenuStrip();
+            
+            // Add monitor selection submenu
+            var monitorsMenu = new ToolStripMenuItem("Select Monitor");
+            for (int i = 0; i < Screen.AllScreens.Length; i++)
+            {
+                var screen = Screen.AllScreens[i];
+                var index = i; // Capture the index for the lambda
+                var item = new ToolStripMenuItem($"Monitor {i+1} ({screen.Bounds.Width}x{screen.Bounds.Height})", 
+                    null, (s, e) => SwitchToMonitor(index));
+                monitorsMenu.DropDownItems.Add(item);
+            }
+            trayMenu.Items.Add(monitorsMenu);
+            
+            // Scale submenu
+            var scaleMenu = new ToolStripMenuItem("Scale");
+            foreach (float scale in new[] { 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 3.0f })
+            {
+                var scaleVal = scale; // Capture for lambda
+                var item = new ToolStripMenuItem($"{scale}x", null, (s, e) => SetScale(scaleVal));
+                scaleMenu.DropDownItems.Add(item);
+            }
+            trayMenu.Items.Add(scaleMenu);
+            
+            // Other menu items
+            trayMenu.Items.Add("Show/Hide", null, OnToggleVisibility);
             trayMenu.Items.Add("About", null, OnAboutClicked);
             trayMenu.Items.Add("Load Crosshair Code", null, OnLoadCrosshairClicked);
-            trayMenu.Items.Add("Use Simple Dot", null, OnSimpleDotClicked);
-            trayMenu.Items.Add("Config", null, OnConfigClicked);
             trayMenu.Items.Add("-"); // Separator
             trayMenu.Items.Add("Exit", null, OnExitClicked);
 
@@ -104,28 +142,88 @@ namespace poji
 
         private void KeyboardHook_KeyDown(object sender, KeyEventArgs e)
         {
-            // Check for Alt+Shift+W
+            // Check for hotkeys
             bool altPressed = (Control.ModifierKeys & Keys.Alt) != 0;
             bool shiftPressed = (Control.ModifierKeys & Keys.Shift) != 0;
+            bool ctrlPressed = (Control.ModifierKeys & Keys.Control) != 0;
 
+            // Alt+Shift+W to exit
             if (altPressed && shiftPressed && e.KeyCode == Keys.W)
             {
                 ExitApplication();
             }
+            
+            // Alt+Shift+H to toggle visibility
+            else if (altPressed && shiftPressed && e.KeyCode == Keys.H)
+            {
+                ToggleVisibility();
+                e.Handled = true;
+            }
+            
+            // Alt+Shift+R to reload crosshair
+            else if (altPressed && shiftPressed && e.KeyCode == Keys.R)
+            {
+                ReloadCrosshair();
+                e.Handled = true;
+            }
+            
+            // Alt+Shift+[1-9] to switch monitors
+            else if (altPressed && shiftPressed && e.KeyCode >= Keys.D1 && e.KeyCode <= Keys.D9)
+            {
+                int screenIndex = e.KeyCode - Keys.D1;
+                if (screenIndex < Screen.AllScreens.Length)
+                {
+                    SwitchToMonitor(screenIndex);
+                }
+                e.Handled = true;
+            }
+        }
+        
+        private void SwitchToMonitor(int index)
+        {
+            if (index >= 0 && index < Screen.AllScreens.Length)
+            {
+                currentMonitorIndex = index;
+                SetFormToScreen(Screen.AllScreens[index]);
+            }
+        }
+        
+        private void SetScale(float scale)
+        {
+            scaleFactor = scale;
+            if (crosshairInfo != null)
+            {
+                crosshairInfo.ScaleFactor = scale;
+                this.Invalidate();
+            }
+        }
+        
+        private void ToggleVisibility()
+        {
+            isVisible = !isVisible;
+            this.Visible = isVisible;
+        }
+        
+        private void ReloadCrosshair()
+        {
+            LoadCrosshairFromSettings();
+            this.Invalidate();
         }
 
         private void OnTrayIconDoubleClick(object sender, EventArgs e)
         {
-            // Toggle visibility
-            if (this.Visible)
-                this.Hide();
-            else
-                this.Show();
+            ToggleVisibility();
+        }
+        
+        private void OnToggleVisibility(object sender, EventArgs e)
+        {
+            ToggleVisibility();
         }
 
         private void OnAboutClicked(object sender, EventArgs e)
         {
-            MessageBox.Show("CS:GO Crosshair Overlay\nVersion 1.0", "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("CS:GO Crosshair Overlay\nVersion 1.0\n\nHotkeys:\nAlt+Shift+W: Exit\nAlt+Shift+H: Toggle visibility\nAlt+Shift+R: Reload crosshair\nAlt+Shift+[1-9]: Switch monitor", 
+                "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void OnLoadCrosshairClicked(object sender, EventArgs e)
@@ -140,42 +238,14 @@ namespace poji
                         var decoder = new CSGOCrosshairDecoder();
                         byte[] bytes = decoder.DecodeShareCode(shareCode);
                         crosshairInfo = decoder.DecodeCrosshairInfo(bytes);
-                        useCustomCrosshair = true;
-                        
-                        // Get the color from the crosshair info
-                        dotColor = crosshairInfo.GetColor();
-                        
-                        // Save to settings if you want
+                        crosshairInfo.ScaleFactor = scaleFactor; // Apply current scale factor
                         SaveCrosshairToSettings(shareCode);
-                        
-                        // Force redraw
                         this.Invalidate();
                     }
                     catch (Exception ex)
                     {
                         MessageBox.Show($"Error decoding crosshair: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
-                }
-            }
-        }
-
-        private void OnSimpleDotClicked(object sender, EventArgs e)
-        {
-            useCustomCrosshair = false;
-            dotColor = Color.Red;
-            dotSize = 10;
-            this.Invalidate();
-        }
-
-        private void OnConfigClicked(object sender, EventArgs e)
-        {
-            using (var configDialog = new ConfigDialog(dotColor, dotSize))
-            {
-                if (configDialog.ShowDialog() == DialogResult.OK)
-                {
-                    dotColor = configDialog.SelectedColor;
-                    dotSize = configDialog.SelectedSize;
-                    this.Invalidate();
                 }
             }
         }
@@ -193,14 +263,32 @@ namespace poji
 
         private void SaveCrosshairToSettings(string shareCode)
         {
-            // Simple implementation - you might want to use Properties.Settings instead
             try
             {
-                File.WriteAllText("crosshair_code.txt", shareCode);
+                // Create a settings directory if it doesn't exist
+                string appDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "CrosshairOverlay");
+                    
+                if (!Directory.Exists(appDataPath))
+                {
+                    Directory.CreateDirectory(appDataPath);
+                }
+                
+                string settingsFile = Path.Combine(appDataPath, "settings.txt");
+                
+                // Save all settings
+                using (StreamWriter writer = new StreamWriter(settingsFile))
+                {
+                    writer.WriteLine($"ShareCode={shareCode}");
+                    writer.WriteLine($"Scale={scaleFactor}");
+                    writer.WriteLine($"Monitor={currentMonitorIndex}");
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore errors
+                // Log error but don't disrupt the application
+                Console.WriteLine($"Error saving settings: {ex.Message}");
             }
         }
 
@@ -208,66 +296,114 @@ namespace poji
         {
             try
             {
-                if (File.Exists("crosshair_code.txt"))
+                string appDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "CrosshairOverlay");
+                string settingsFile = Path.Combine(appDataPath, "settings.txt");
+                
+                if (File.Exists(settingsFile))
                 {
-                    string shareCode = File.ReadAllText("crosshair_code.txt");
-                    var decoder = new CSGOCrosshairDecoder();
-                    byte[] bytes = decoder.DecodeShareCode(shareCode);
-                    crosshairInfo = decoder.DecodeCrosshairInfo(bytes);
-                    useCustomCrosshair = true;
-                    dotColor = crosshairInfo.GetColor();
+                    string shareCode = null;
+                    
+                    // Read settings line by line
+                    foreach (string line in File.ReadAllLines(settingsFile))
+                    {
+                        string[] parts = line.Split('=');
+                        if (parts.Length != 2) continue;
+                        
+                        string key = parts[0].Trim();
+                        string value = parts[1].Trim();
+                        
+                        if (key == "ShareCode")
+                        {
+                            shareCode = value;
+                        }
+                        else if (key == "Scale")
+                        {
+                            if (float.TryParse(value, out float scale))
+                            {
+                                scaleFactor = scale;
+                            }
+                        }
+                        else if (key == "Monitor")
+                        {
+                            if (int.TryParse(value, out int monitor) && 
+                                monitor >= 0 && monitor < Screen.AllScreens.Length)
+                            {
+                                currentMonitorIndex = monitor;
+                                SetFormToScreen(Screen.AllScreens[monitor]);
+                            }
+                        }
+                    }
+                    
+                    // Load crosshair if we found a share code
+                    if (!string.IsNullOrEmpty(shareCode))
+                    {
+                        var decoder = new CSGOCrosshairDecoder();
+                        byte[] bytes = decoder.DecodeShareCode(shareCode);
+                        crosshairInfo = decoder.DecodeCrosshairInfo(bytes);
+                        crosshairInfo.ScaleFactor = scaleFactor;
+                        useCustomCrosshair = true;
+                    }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Fallback to default dot
+                // Fallback to default dot if an error occurs
                 useCustomCrosshair = false;
+                Console.WriteLine($"Error loading settings: {ex.Message}");
             }
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            
-            // Calculate center position
+
+            if (!isVisible) return;
+
             int centerX = this.Width / 2;
             int centerY = this.Height / 2;
-            
-            // Enable anti-aliasing
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
-            if (useCustomCrosshair && crosshairInfo != null)
+            if (crosshairInfo != null)
             {
                 DrawCrosshair(e.Graphics, centerX, centerY);
             }
             else
             {
-                // Draw simple dot
+                // Draw fallback tiny dot
                 using (var brush = new SolidBrush(dotColor))
                 {
-                    e.Graphics.FillEllipse(
-                        brush,
-                        centerX - dotSize / 2,
-                        centerY - dotSize / 2,
-                        dotSize,
-                        dotSize
-                    );
+                    int size = (int)(dotSize * scaleFactor);
+                    e.Graphics.FillEllipse(brush, centerX - size/2, centerY - size/2, size, size);
                 }
             }
         }
 
         private void DrawCrosshair(Graphics g, int centerX, int centerY)
         {
+            // Apply scale factor to all crosshair dimensions
+            float halfLength = crosshairInfo.Length * scaleFactor / 2;
+            float halfThickness = crosshairInfo.Thickness * scaleFactor / 2;
+            float halfGap = crosshairInfo.Gap * scaleFactor / 2;
+            float outlineThickness = crosshairInfo.Outline * scaleFactor;
+            
+            // Create colors with proper alpha
+            Color mainColor = Color.FromArgb(
+                crosshairInfo.Alpha, 
+                crosshairInfo.Red, 
+                crosshairInfo.Green, 
+                crosshairInfo.Blue);
+                
+            Color outlineColor = Color.FromArgb(
+                crosshairInfo.Alpha, 
+                0, 0, 0); // Black outline with same alpha
+            
             // Set up pens for drawing
-            using (var mainPen = new Pen(Color.FromArgb(crosshairInfo.Alpha, crosshairInfo.Red, crosshairInfo.Green, crosshairInfo.Blue), crosshairInfo.Thickness))
-            using (var outlinePen = new Pen(Color.Black, crosshairInfo.Thickness + (crosshairInfo.HasOutline ? crosshairInfo.Outline * 2 : 0)))
-            using (var dotBrush = new SolidBrush(Color.FromArgb(crosshairInfo.Alpha, crosshairInfo.Red, crosshairInfo.Green, crosshairInfo.Blue)))
+            using (var mainPen = new Pen(mainColor, crosshairInfo.Thickness * scaleFactor))
+            using (var outlinePen = new Pen(outlineColor, crosshairInfo.Thickness * scaleFactor + (crosshairInfo.HasOutline ? outlineThickness * 2 : 0)))
+            using (var dotBrush = new SolidBrush(mainColor))
             {
-                // Calculate dimensions
-                float halfLength = crosshairInfo.Length / 2;
-                float halfThickness = crosshairInfo.Thickness / 2;
-                float halfGap = crosshairInfo.Gap / 2;
-
                 // Draw outline first if enabled
                 if (crosshairInfo.HasOutline)
                 {
@@ -298,7 +434,7 @@ namespace poji
                 // Draw center dot if enabled
                 if (crosshairInfo.HasCenterDot)
                 {
-                    float dotSize = crosshairInfo.Thickness * 1.5f;
+                    float dotSize = crosshairInfo.Thickness * scaleFactor * 1.5f;
                     g.FillEllipse(dotBrush, centerX - dotSize / 2, centerY - dotSize / 2, dotSize, dotSize);
                 }
             }
@@ -308,9 +444,15 @@ namespace poji
         {
             base.OnLoad(e);
             LoadCrosshairFromSettings();
+
+            // Prompt user if no crosshair is loaded
+            if (crosshairInfo == null)
+            {
+                OnLoadCrosshairClicked(this, EventArgs.Empty);
+            }
         }
 
-        // Allow form to close when exit triggered
+        // Allow form to close when exit is triggered
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             // Only cancel if it's not an explicit exit
@@ -398,113 +540,6 @@ namespace poji
 
             this.AcceptButton = okButton;
             this.CancelButton = cancelButton;
-        }
-    }
-
-    // Configuration dialog for simple dot mode
-    public class ConfigDialog : Form
-    {
-        private Button okButton;
-        private Button cancelButton;
-        private Label colorLabel;
-        private Label sizeLabel;
-        private NumericUpDown sizeNumeric;
-        private Button colorButton;
-        private ColorDialog colorDialog;
-
-        public Color SelectedColor { get; private set; }
-        public int SelectedSize { get; private set; }
-
-        public ConfigDialog(Color initialColor, int initialSize)
-        {
-            this.Text = "Crosshair Configuration";
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.Size = new Size(300, 200);
-
-            SelectedColor = initialColor;
-            SelectedSize = initialSize;
-
-            colorLabel = new Label
-            {
-                Text = "Color:",
-                Location = new Point(10, 20),
-                Size = new Size(100, 20)
-            };
-
-            colorButton = new Button
-            {
-                BackColor = initialColor,
-                Location = new Point(120, 20),
-                Size = new Size(50, 20)
-            };
-            colorButton.Click += ColorButton_Click;
-
-            sizeLabel = new Label
-            {
-                Text = "Size:",
-                Location = new Point(10, 50),
-                Size = new Size(100, 20)
-            };
-
-            sizeNumeric = new NumericUpDown
-            {
-                Location = new Point(120, 50),
-                Size = new Size(50, 20),
-                Minimum = 1,
-                Maximum = 50,
-                Value = initialSize
-            };
-
-            okButton = new Button
-            {
-                Text = "OK",
-                DialogResult = DialogResult.OK,
-                Location = new Point(120, 120),
-                Size = new Size(75, 23)
-            };
-            okButton.Click += OkButton_Click;
-
-            cancelButton = new Button
-            {
-                Text = "Cancel",
-                DialogResult = DialogResult.Cancel,
-                Location = new Point(200, 120),
-                Size = new Size(75, 23)
-            };
-
-            colorDialog = new ColorDialog
-            {
-                AnyColor = true,
-                FullOpen = true,
-                Color = initialColor
-            };
-
-            this.Controls.Add(colorLabel);
-            this.Controls.Add(colorButton);
-            this.Controls.Add(sizeLabel);
-            this.Controls.Add(sizeNumeric);
-            this.Controls.Add(okButton);
-            this.Controls.Add(cancelButton);
-
-            this.AcceptButton = okButton;
-            this.CancelButton = cancelButton;
-        }
-
-        private void ColorButton_Click(object sender, EventArgs e)
-        {
-            if (colorDialog.ShowDialog() == DialogResult.OK)
-            {
-                colorButton.BackColor = colorDialog.Color;
-                SelectedColor = colorDialog.Color;
-            }
-        }
-
-        private void OkButton_Click(object sender, EventArgs e)
-        {
-            SelectedSize = (int)sizeNumeric.Value;
         }
     }
 }
