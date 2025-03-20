@@ -20,7 +20,6 @@ jobs:
       Solution_Name: poji.sln                         # Replace with your solution name
       Wap_Project_Directory: poji.Package            # WAP project directory
       Wap_Project_Path: poji.Package\poji.Package.wapproj  # Path to WAP project
-      Platform: x64                                   # Target 64-bit only
 
     steps:
     - name: Checkout
