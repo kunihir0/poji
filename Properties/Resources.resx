@@ -114,4 +114,38 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="InputDialog_InitializeControls_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="InputDialog_InitializeControls_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="MainForm_InitializeComponent_Crosshair_Overlay" xml:space="preserve">
+    <value>Crosshair Overlay</value>
+  </data>
+  <data name="MainForm_LoadCrosshairFromSettings_Error_loading_crosshair_settings___0_" xml:space="preserve">
+    <value>Error loading crosshair settings: {0}</value>
+  </data>
+  <data name="ConfigurationManager_LoadSettings_Error_loading_settings___0_" xml:space="preserve">
+    <value>Error loading settings: {0}</value>
+  </data>
+  <data name="ConfigurationManager_SaveAllSettings_Error_saving_settings___0_" xml:space="preserve">
+    <value>Error saving settings: {0}</value>
+  </data>
+  <data name="TrayIconManager_OnAboutClicked_" xml:space="preserve">
+    <value>CS:GO Crosshair Overlay
+Version 1.0
+
+Hotkeys:
+Alt+Shift+W: Exit
+Alt+Shift+H: Toggle visibility
+Alt+Shift+R: Reload crosshair
+Alt+Shift+[1-9]: Switch monitor</value>
+  </data>
+  <data name="TrayIconManager_OnAboutClicked_About" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="TrayIconManager_InitializeTrayIcon_Crosshair_Overlay" xml:space="preserve">
+    <value>Crosshair Overlay</value>
+  </data>
 </root>

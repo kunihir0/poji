@@ -5,14 +5,14 @@ using System.Windows.Forms;
 
 namespace poji
 {
-    public class GlobalKeyboardHook : IDisposable
+    public sealed class GlobalKeyboardHook : IDisposable
     {
         // Win32 API constants and imports
-        private const int WH_KEYBOARD_LL = 13;
-        private const int WM_KEYDOWN = 0x0100;
-        private const int WM_KEYUP = 0x0101;
-        private const int WM_SYSKEYDOWN = 0x0104;
-        private const int WM_SYSKEYUP = 0x0105;
+        private const int WhKeyboardLl = 13;
+        private const int WmKeydown = 0x0100;
+        private const int WmKeyup = 0x0101;
+        private const int WmSyskeydown = 0x0104;
+        private const int WmSyskeyup = 0x0105;
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
@@ -29,9 +29,9 @@ namespace poji
 
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
-        private LowLevelKeyboardProc _proc;
-        private IntPtr _hookID = IntPtr.Zero;
-        private bool _isStarted = false;
+        private readonly LowLevelKeyboardProc _proc;
+        private IntPtr _hookId = IntPtr.Zero;
+        private bool _isStarted;
 
         public event KeyEventHandler KeyDown;
         public event KeyEventHandler KeyUp;
@@ -45,17 +45,17 @@ namespace poji
         {
             if (!_isStarted)
             {
-                _hookID = SetHook(_proc);
+                _hookId = SetHook(_proc);
                 _isStarted = true;
             }
         }
 
         public void Stop()
         {
-            if (_isStarted && _hookID != IntPtr.Zero)
+            if (_isStarted && _hookId != IntPtr.Zero)
             {
-                UnhookWindowsHookEx(_hookID);
-                _hookID = IntPtr.Zero;
+                UnhookWindowsHookEx(_hookId);
+                _hookId = IntPtr.Zero;
                 _isStarted = false;
             }
         }
@@ -65,7 +65,7 @@ namespace poji
             using (Process curProcess = Process.GetCurrentProcess())
             using (ProcessModule curModule = curProcess.MainModule)
             {
-                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
+                return SetWindowsHookEx(WhKeyboardLl, proc, GetModuleHandle(curModule.ModuleName), 0);
             }
         }
 
@@ -77,7 +77,7 @@ namespace poji
                 Keys key = (Keys)vkCode;
 
                 // Check if it's a key we're interested in
-                if ((wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN) && KeyDown != null)
+                if ((wParam == (IntPtr)WmKeydown || wParam == (IntPtr)WmSyskeydown) && KeyDown != null)
                 {
                     KeyEventArgs args = new KeyEventArgs(key);
                     KeyDown(this, args);
@@ -85,7 +85,7 @@ namespace poji
                     if (args.Handled)
                         return (IntPtr)1;
                 }
-                else if ((wParam == (IntPtr)WM_KEYUP || wParam == (IntPtr)WM_SYSKEYUP) && KeyUp != null)
+                else if ((wParam == (IntPtr)WmKeyup || wParam == (IntPtr)WmSyskeyup) && KeyUp != null)
                 {
                     KeyEventArgs args = new KeyEventArgs(key);
                     KeyUp(this, args);
@@ -95,15 +95,15 @@ namespace poji
                 }
             }
 
-            return CallNextHookEx(_hookID, nCode, wParam, lParam);
+            return CallNextHookEx(_hookId, nCode, wParam, lParam);
         }
 
         #region IDisposable Support
-        private bool disposedValue = false;
+        private bool _disposedValue;
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
-            if (!disposedValue)
+            if (!_disposedValue)
             {
                 if (disposing)
                 {
@@ -113,7 +113,7 @@ namespace poji
                 // Free unmanaged resources (unmanaged objects) and override finalizer
                 Stop();
 
-                disposedValue = true;
+                _disposedValue = true;
             }
         }
 

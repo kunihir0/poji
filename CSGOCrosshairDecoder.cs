@@ -8,11 +8,11 @@ using System.Text.RegularExpressions;
 
 namespace poji
 {
-    public class CSGOCrosshairDecoder
+    public class CsgoCrosshairDecoder
     {
         // Dictionary and regex pattern
-        private const string DICTIONARY = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefhijkmnopqrstuvwxyz23456789";
-        private static readonly Regex SHARECODE_PATTERN = new Regex(@"^CSGO(-?[\w]{5}){5}$");
+        private const string Dictionary = "ABCDEFGHJKLMNOPQRSTUVWXYZabcdefhijkmnopqrstuvwxyz23456789";
+        private static readonly Regex SharecodePattern = new Regex(@"^CSGO(-?[\w]{5}){5}$");
 
         // Crosshair style enum
         public enum CrosshairStyle
@@ -114,7 +114,7 @@ namespace poji
             // Clone method for creating copies with different scale factors
             public CrosshairInfo Clone()
             {
-                return (CrosshairInfo)this.MemberwiseClone();
+                return (CrosshairInfo)MemberwiseClone();
             }
         }
 
@@ -142,7 +142,7 @@ namespace poji
         public byte[] DecodeShareCode(string shareCode)
         {
             // Validate share code format
-            if (!SHARECODE_PATTERN.IsMatch(shareCode))
+            if (!SharecodePattern.IsMatch(shareCode))
             {
                 throw new ArgumentException("Invalid share code format. Must be like: CSGO-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX");
             }
@@ -153,11 +153,11 @@ namespace poji
 
             // Convert to big integer (reversed)
             BigInteger big = 0;
-            BigInteger baseNum = DICTIONARY.Length;
+            BigInteger baseNum = Dictionary.Length;
 
             foreach (char c in code.Reverse())
             {
-                int pos = DICTIONARY.IndexOf(c);
+                int pos = Dictionary.IndexOf(c);
                 if (pos == -1)
                 {
                     throw new ArgumentException($"Invalid character '{c}' in share code");
