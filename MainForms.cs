@@ -36,6 +36,7 @@ namespace poji
             _trayManager.LoadCrosshairRequested += (s, e) => ShowLoadCrosshairDialog();
             _trayManager.MonitorChangeRequested += (s, e) => SwitchToMonitor(e.MonitorIndex);
             _trayManager.ScaleChangeRequested += (s, e) => SetScale(e.ScaleFactor);
+            _trayManager.SettingsRequested += (s, e) => ShowSettingsDialog();
         }
 
         private void InitializeComponent()
@@ -267,6 +268,27 @@ namespace poji
                     }
                 }
             }
+        }
+
+        private void ShowSettingsDialog()
+        {
+            // Temporarily disable click-through to interact with the dialog
+            SetClickThroughEnabled(false);
+            
+            using (var settingsForm = new SettingsForm(_configManager, _hotkeyManager))
+            {
+                if (settingsForm.ShowDialog() == DialogResult.OK)
+                {
+                    // Apply changes immediately
+                    LoadSettings();
+                    
+                    // Update hotkey bindings
+                    _hotkeyManager.UpdateBindings(_configManager.GetHotkeyBindings());
+                }
+            }
+            
+            // Re-enable click-through
+            SetClickThroughEnabled(true);
         }
 
         private void LoadSettings()

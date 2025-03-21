@@ -37,6 +37,7 @@ namespace poji
         public event EventHandler LoadCrosshairRequested;
         public event EventHandler<MonitorChangeEventArgs> MonitorChangeRequested;
         public event EventHandler<ScaleChangeEventArgs> ScaleChangeRequested;
+        public event EventHandler SettingsRequested;
         
         public TrayIconManager(Form ownerForm)
         {
@@ -74,6 +75,7 @@ namespace poji
             _trayMenu.Items.Add("Show/Hide", null, (s, e) => ToggleVisibilityRequested?.Invoke(this, EventArgs.Empty));
             _trayMenu.Items.Add(Resources.TrayIconManager_OnAboutClicked_About, null, OnAboutClicked);
             _trayMenu.Items.Add("Load Crosshair Code", null, (s, e) => LoadCrosshairRequested?.Invoke(this, EventArgs.Empty));
+            _trayMenu.Items.Add("Settings", null, (s, e) => SettingsRequested?.Invoke(this, EventArgs.Empty));
             _trayMenu.Items.Add("-"); // Separator
             _trayMenu.Items.Add("Exit", null, (s, e) => ExitRequested?.Invoke(this, EventArgs.Empty));
 
