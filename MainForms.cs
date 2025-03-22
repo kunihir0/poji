@@ -8,6 +8,10 @@ namespace poji
 {
     public class MainForm : Form
     {
+        private RecoilPatternManager _recoilPatternManager;
+        private RecoilPatternRenderer _recoilPatternRenderer;
+        private bool _showRecoilPattern = false;
+        private RecoilPattern _currentRecoilPattern = null;
         // Managers for different responsibilities
         private readonly TrayIconManager _trayManager;
         private readonly CrosshairRenderer _crosshairRenderer;

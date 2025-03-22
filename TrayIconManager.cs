@@ -38,7 +38,11 @@ namespace poji
         public event EventHandler<MonitorChangeEventArgs> MonitorChangeRequested;
         public event EventHandler<ScaleChangeEventArgs> ScaleChangeRequested;
         public event EventHandler SettingsRequested;
-        
+        public event EventHandler ToggleRecoilPatternRequested;
+        public event EventHandler ManageRecoilPatternsRequested;
+        public event EventHandler StartFollowingPatternRequested;
+        public event EventHandler StopFollowingPatternRequested;
+
         public TrayIconManager(Form ownerForm)
         {
             OwnerForm = ownerForm;
@@ -88,6 +92,20 @@ namespace poji
             };
 
             _trayIcon.DoubleClick += (s, e) => ToggleVisibilityRequested?.Invoke(this, EventArgs.Empty);
+
+            // Recoil pattern submenu
+            var recoilMenu = new ToolStripMenuItem("Recoil Pattern");
+            recoilMenu.DropDownItems.Add(new ToolStripMenuItem("Show/Hide Pattern", null, 
+                (s, e) => ToggleRecoilPatternRequested?.Invoke(this, EventArgs.Empty)));
+            recoilMenu.DropDownItems.Add(new ToolStripMenuItem("Record/Load Patterns", null, 
+                (s, e) => ManageRecoilPatternsRequested?.Invoke(this, EventArgs.Empty)));
+            _trayMenu.Items.Add(recoilMenu);
+
+            recoilMenu.DropDownItems.Add("-"); // Separator
+            recoilMenu.DropDownItems.Add(new ToolStripMenuItem("Start Pattern Guidance", null,
+                (s, e) => StartFollowingPatternRequested?.Invoke(this, EventArgs.Empty)));
+            recoilMenu.DropDownItems.Add(new ToolStripMenuItem("Stop Pattern Guidance", null,
+                (s, e) => StopFollowingPatternRequested?.Invoke(this, EventArgs.Empty)));
         }
         
         private void OnMonitorSelected(int index)

@@ -9,7 +9,10 @@ namespace poji
         Exit,
         ToggleVisibility,
         ReloadCrosshair,
-        SwitchMonitor
+        SwitchMonitor,
+        ToggleRecoilPattern,
+        StartRecoilGuidance,
+        StopRecoilGuidance
     }
     
     public class HotkeyEventArgs : EventArgs

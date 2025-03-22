@@ -288,5 +288,29 @@ namespace poji
             SaveHotkeyBindings(defaultBindings);
             SaveAllSettings();
         }
+
+        // Properties to get current settings
+        public bool IsRecoilPatternEnabled()
+        {
+            return Properties.Settings.Default.RecoilPatternEnabled;
+        }
+
+        public string CurrentRecoilPatternName
+        {
+            get { return Properties.Settings.Default.RecoilPatternName; }
+        }
+
+        // Methods to save settings
+        public void SaveRecoilPatternEnabled(bool enabled)
+        {
+            Properties.Settings.Default.RecoilPatternEnabled = enabled;
+            Properties.Settings.Default.Save();
+        }
+
+        public void SaveRecoilPatternName(string patternName)
+        {
+            Properties.Settings.Default.RecoilPatternName = patternName;
+            Properties.Settings.Default.Save();
+        }
     }
 }
