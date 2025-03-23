@@ -1,45 +1,55 @@
-# 🎯 poji
+# 🎮 poji-pojji – Crosshair with Share Code Magic ✨  
 
-### A Cute & Quirky Crosshair Customizer for CSGO 🕹️✨
-
-Welcome to **poji**, the latest addition to your CSGO toolkit! Designed with a playful and user-friendly interface, **poji** makes it a breeze to customize your crosshair in ways you've never imagined. Whether you're tweaking the size, switching between monitors, or assigning unique hotkeys, **poji** has got you covered!
+Your friendly crosshair companion! **poji-pojji** lets you tweak, share, and switch crosshairs effortlessly. Perfect for CSGO players who want precision *and* style—now with **crosshair share code support**!  
 
 ---
 
-#### 🚀 Features at a Glance
+### 🎯 **Features**  
 
-- **Customizable Crosshair:** Adjust every aspect of your crosshair to suit your style.
-- **Monitor Selection:** Easily switch which monitor your game appears on with just a click.
-- **Hotkey Assignments:** Set unique hotkeys for quick access to all your features.
-- **Tray Icon Convenience:** Manage everything from the cozy little tray icon, ensuring you never leave the action.
-
----
-
-#### 🛠️ How It Works
-
-1. **Load Settings:** Start by loading your preferred settings or default configurations.
-2. **Adjust Crosshair:** Tweak the size and other properties to find that perfect balance.
-3. **Monitor Switching:** Move your game window effortlessly between connected monitors.
-4. **Hotkey Customization:** Assign hotkeys for all your favorite actions, like toggling visibility or changing scales.
-5. **Save & Exit:** Save your settings and enjoy playing with your perfectly customized crosshair!
+- **Customize Every Detail**  
+  Adjust size, color, gap, and more. Make it yours!  
+- **Share Codes Made Easy** 🔑  
+  Import/export CSGO crosshair configs instantly using share codes.  
+- **Quick Monitor Swapping** 🖥️  
+  Move your game between screens with one click.  
+- **Smart Hotkeys** ⌨️  
+  Assign shortcuts to toggle crosshairs, switch monitors, or save presets.  
+- **Tray Icon Simplicity** 📌  
+  Control everything from your system tray—no clutter!  
 
 ---
 
-#### 📋 Getting Started
+### 🛠️ **How to Use**  
 
-1. **Download:** Grab the latest version of **poji** from our releases.
-2. **Install:** Follow the instructions to install on your system.
-3. **Launch:** Start the application, and you'll be greeted by an intuitive interface ready for customization.
+1. **Load or Create**  
+   Start fresh or import a crosshair via share code.  
+2. **Tweak & Preview**  
+   Use sliders to adjust settings in real-time.  
+3. **Share or Save** 💾  
+   Generate a share code for friends or save your preset.  
+4. **Switch Monitors** 🔄  
+   Click to move CSGO to another display mid-game.  
+5. **Play!** 🎯  
 
 ---
 
-#### 🛍️ Dependencies
+### 📥 **Get Started**  
 
-- .NET Framework 4.8 or higher
-- Additional dependencies will be listed in the installation guide.
+1. **Download** the latest version.  
+2. **Install** in seconds (no tech wizardry needed).  
+3. **Launch** and customize away!  
 
 ---
 
-#### 🔑 License
+### ⚙️ **Requirements**  
+- .NET Framework 4.8+  
+- CSGO (or a game that supports share codes)  
 
-**poji** is released under the DO WHAT THE FUCK YOU WANT TO PUBLIC License. Check our [LICENSE](LICENSE.md) file for more details.
+---
+
+### 📜 **License**  
+**poji-pojji** is free and open-source under the [WTFPL](LICENSE.md). Do *whatever* you want with it!  
+
+--- 
+
+🌟 **Pro Tip:** Share your wildest crosshair designs with friends using codes—no config files needed!

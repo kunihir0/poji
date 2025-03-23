@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
+using poji.Models;
 
-namespace poji
+namespace poji.Controls
 {
+    /// <summary>
+    /// A custom control for capturing and displaying keyboard hotkey combinations.
+    /// </summary>
     public class HotkeyControl : Control
     {
         private Keys _key = Keys.None;
@@ -13,9 +17,19 @@ namespace poji
         private bool _isEditing;
         private BorderStyle _borderStyle = BorderStyle.FixedSingle;
 
+        /// <summary>
+        /// Occurs when the control enters hotkey capture mode.
+        /// </summary>
         public event EventHandler HotkeyFocusEntered;
+
+        /// <summary>
+        /// Occurs when the control exits hotkey capture mode.
+        /// </summary>
         public event EventHandler HotkeyFocusLeft;
 
+        /// <summary>
+        /// Gets or sets the border style for the control.
+        /// </summary>
         public BorderStyle BorderStyle
         {
             get => _borderStyle;
@@ -25,6 +39,10 @@ namespace poji
                 Invalidate();
             }
         }
+
+        /// <summary>
+        /// Initializes a new instance of the HotkeyControl class.
+        /// </summary>
         public HotkeyControl()
         {
             SetStyle(ControlStyles.Selectable, true);
@@ -38,54 +56,66 @@ namespace poji
             MinimumSize = new Size(50, 24);
             Cursor = Cursors.Hand;
 
-            this.Click += (s, e) => StartEditing();
+            Click += (s, e) => StartEditing();
         }
 
+        /// <summary>
+        /// Paints the control.
+        /// </summary>
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
             Graphics g = e.Graphics;
 
-            // Draw the background
-            using (SolidBrush bgBrush = new SolidBrush(BackColor))
+            // Draw background
+            using (SolidBrush backgroundBrush = new SolidBrush(BackColor))
             {
-                g.FillRectangle(bgBrush, ClientRectangle);
+                g.FillRectangle(backgroundBrush, ClientRectangle);
             }
 
-            // Draw the border if needed
+            // Draw border
             if (_borderStyle == BorderStyle.FixedSingle)
             {
-                using (Pen borderPen = new Pen(_isEditing ? Color.FromArgb(0, 120, 215) : Color.FromArgb(100, 100, 100)))
+                System.Drawing.Color borderColor = _isEditing ?
+                    System.Drawing.Color.FromArgb(0, 120, 215) :
+                    System.Drawing.Color.FromArgb(100, 100, 100);
+
+                using (Pen borderPen = new Pen(borderColor))
                 {
                     g.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
                 }
             }
 
-            // Calculate the center position for the text
-            string text = _isEditing ? "Press a key..." : GetDisplayText();
-            SizeF textSize = g.MeasureString(text, Font);
+            // Draw text
+            string displayText = _isEditing ? "Press a key..." : GetDisplayText();
+            SizeF textSize = g.MeasureString(displayText, Font);
             float x = (Width - textSize.Width) / 2;
             float y = (Height - textSize.Height) / 2;
 
-            // Draw the text
             using (SolidBrush textBrush = new SolidBrush(ForeColor))
             {
-                g.DrawString(text, Font, textBrush, x, y);
+                g.DrawString(displayText, Font, textBrush, x, y);
             }
 
-            // Draw focus rectangle if focused
+            // Draw focus rectangle
             if (Focused && !_isEditing)
             {
                 ControlPaint.DrawFocusRectangle(g, new Rectangle(2, 2, Width - 4, Height - 4));
             }
         }
 
+        /// <summary>
+        /// Handles the control gaining focus.
+        /// </summary>
         protected override void OnGotFocus(EventArgs e)
         {
             base.OnGotFocus(e);
             StartEditing();
         }
 
+        /// <summary>
+        /// Handles the control losing focus.
+        /// </summary>
         protected override void OnLostFocus(EventArgs e)
         {
             base.OnLostFocus(e);
@@ -106,6 +136,9 @@ namespace poji
             Invalidate();
         }
 
+        /// <summary>
+        /// Sets the hotkey from keyboard input.
+        /// </summary>
         public void SetKey(Keys keyData)
         {
             // Extract modifiers
@@ -113,31 +146,42 @@ namespace poji
             _alt = (keyData & Keys.Alt) == Keys.Alt;
             _shift = (keyData & Keys.Shift) == Keys.Shift;
 
-            // Extract the actual key
+            // Extract actual key
             _key = keyData & Keys.KeyCode;
 
-            // Handle special cases
-            if (_key == Keys.Escape) // Clear the binding if Escape is pressed
+            // Handle special case: Escape clears the binding
+            if (_key == Keys.Escape)
             {
-                _key = Keys.None;
-                _ctrl = _alt = _shift = false;
+                ClearHotkey();
                 StopEditing();
-                Invalidate();
                 return;
             }
 
             // Ignore modifier keys when pressed alone
-            if (_key == Keys.ControlKey || _key == Keys.ShiftKey || _key == Keys.Menu)
+            if (IsModifierKey(_key))
             {
-                // Don't set the key, just keep editing
-                return;
+                return; // Keep editing
             }
 
-            // Stop editing
             StopEditing();
             Invalidate();
         }
 
+        private bool IsModifierKey(Keys key)
+        {
+            return key == Keys.ControlKey || key == Keys.ShiftKey || key == Keys.Menu;
+        }
+
+        private void ClearHotkey()
+        {
+            _key = Keys.None;
+            _ctrl = _alt = _shift = false;
+            Invalidate();
+        }
+
+        /// <summary>
+        /// Gets a text representation of the current hotkey.
+        /// </summary>
         public string GetDisplayText()
         {
             if (_key == Keys.None)
@@ -156,6 +200,10 @@ namespace poji
             return text;
         }
 
+        /// <summary>
+        /// Gets the current hotkey binding.
+        /// </summary>
+        /// <returns>A HotkeyBinding object, or null if no key is set.</returns>
         public HotkeyBinding GetBinding()
         {
             if (_key == Keys.None) return null;
@@ -169,14 +217,14 @@ namespace poji
             };
         }
 
+        /// <summary>
+        /// Sets the hotkey binding from a HotkeyBinding object.
+        /// </summary>
         public void SetBinding(HotkeyBinding binding)
         {
             if (binding == null)
             {
-                _key = Keys.None;
-                _alt = false;
-                _shift = false;
-                _ctrl = false;
+                ClearHotkey();
             }
             else
             {

@@ -3,33 +3,36 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using poji.Configuration;
+using poji.Controls;
+using poji.Models;
+using poji.Enums;
+using poji.Controls.Extensions;
 
 namespace poji
 {
     public partial class SettingsForm : Form
     {
-        private readonly ConfigurationManager _configManager;
-        private readonly HotkeyManager _hotkeyManager;
-        private Dictionary<string, HotkeyBinding> _currentBindings = new Dictionary<string, HotkeyBinding>();
+        private ConfigurationManager _configManager;
+        private HotkeyManager _hotkeyManager;
+        private Dictionary<poji.Enums.HotkeyAction, HotkeyBinding> _originalBindings = new Dictionary<poji.Enums.HotkeyAction, HotkeyBinding>();
         private HotkeyControl _activeHotkeyControl;
 
         // Control references
-        private ComboBox scaleDropdown;
-        private ComboBox monitorDropdown;
-        private TextBox crosshairTextBox;
-        private TableLayoutPanel hotkeysLayout;
-        private Button saveButton;
-        private Button resetButton;
-        private Button cancelButton;
-        private Button applyButton;
+        private ComboBox _scaleDropdown;
+        private ComboBox _monitorDropdown;
+        private TextBox _crosshairTextBox;
+        private TableLayoutPanel _hotkeysLayout;
+        private Button _saveButton;
+        private Button _resetButton;
+        private Button _cancelButton;
+        private Button _applyButton;
 
-        // Theme colors
-        private readonly Color _primaryColor = Color.FromArgb(42, 42, 42);
-        private readonly Color _secondaryColor = Color.FromArgb(60, 60, 60);
-        private readonly Color _accentColor = Color.FromArgb(0, 120, 215);
-        private readonly Color _textColor = Color.FromArgb(240, 240, 240);
-        private readonly Color _controlBackColor = Color.FromArgb(70, 70, 70);
-        private readonly Color _controlForeColor = Color.FromArgb(240, 240, 240);
+        private const float DEFAULT_SCALE = 1.0f;
+        private const string TOGGLE_VISIBILITY = "ToggleVisibility";
+        private const string EXIT_ACTION = "Exit";
+        private const string RELOAD_CROSSHAIR = "ReloadCrosshair";
+        private const string SWITCH_MONITOR = "SwitchMonitor";
 
         public SettingsForm(ConfigurationManager configManager, HotkeyManager hotkeyManager)
         {
@@ -37,141 +40,92 @@ namespace poji
             _hotkeyManager = hotkeyManager ?? throw new ArgumentNullException(nameof(hotkeyManager));
 
             InitializeComponent();
-            ApplyCustomTheme();
 
             // Prevent design-time execution
             if (!DesignMode)
             {
                 LoadSettings();
-                LoadMonitorDropdown();
+                PopulateMonitorDropdown();
             }
         }
 
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-
-            // Ensure all controls are properly sized and positioned
             PerformLayout();
         }
 
         private void InitializeComponent()
         {
-            this.SuspendLayout();
-
-            // Form settings
-            this.Text = "Crosshair Overlay Settings";
-            this.Size = new Size(550, 650);
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimizeBox = true;
-            this.ShowIcon = true;
-            this.ShowInTaskbar = true;
-            this.Font = new Font("Segoe UI", 9F);
-            this.AutoScaleMode = AutoScaleMode.Font;
-            this.Padding = new Padding(10);
-
-            // Create the controls
+            SuspendLayout();
+            ConfigureFormProperties();
             CreateControls();
-            SetupEventHandlers();
-
-            this.ResumeLayout(false);
+            RegisterEventHandlers();
+            ResumeLayout(false);
         }
 
-        private void ApplyCustomTheme()
+        private void ConfigureFormProperties()
         {
-            // Apply theme to the form
-            this.BackColor = _primaryColor;
-            this.ForeColor = _textColor;
-
-            // Apply theme to all controls recursively
-            ApplyThemeToControls(this.Controls);
-        }
-
-        private void ApplyThemeToControls(Control.ControlCollection controls)
-        {
-            foreach (Control control in controls)
-            {
-                // Apply specific styling based on control type
-                if (control is Button button)
-                {
-                    button.FlatStyle = FlatStyle.Flat;
-                    button.FlatAppearance.BorderColor = _accentColor;
-                    button.BackColor = _secondaryColor;
-                    button.ForeColor = _textColor;
-                    button.Cursor = Cursors.Hand;
-
-                    // Special handling for action buttons
-                    if (button == saveButton)
-                    {
-                        button.BackColor = _accentColor;
-                        button.FlatAppearance.BorderColor = Color.White;
-                    }
-                }
-                else if (control is TextBox textBox)
-                {
-                    textBox.BorderStyle = BorderStyle.FixedSingle;
-                    textBox.BackColor = _controlBackColor;
-                    textBox.ForeColor = _controlForeColor;
-                }
-                else if (control is ComboBox comboBox)
-                {
-                    comboBox.FlatStyle = FlatStyle.Flat;
-                    comboBox.BackColor = _controlBackColor;
-                    comboBox.ForeColor = _controlForeColor;
-                }
-                else if (control is GroupBox groupBox)
-                {
-                    groupBox.ForeColor = _textColor;
-                    groupBox.BackColor = _primaryColor;
-                }
-                else if (control is HotkeyControl hotkeyControl)
-                {
-                    hotkeyControl.BackColor = _controlBackColor;
-                    hotkeyControl.ForeColor = _controlForeColor;
-                    hotkeyControl.BorderStyle = BorderStyle.FixedSingle;
-                }
-                else if (control is Label)
-                {
-                    control.ForeColor = _textColor;
-                }
-                else
-                {
-                    control.BackColor = _primaryColor;
-                    control.ForeColor = _textColor;
-                }
-
-                // Recursively apply to child controls
-                if (control.Controls.Count > 0)
-                {
-                    ApplyThemeToControls(control.Controls);
-                }
-            }
+            Text = "Crosshair Overlay Settings";
+            Size = new Size(550, 650);
+            StartPosition = FormStartPosition.CenterScreen;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = true;
+            ShowIcon = true;
+            ShowInTaskbar = true;
+            Font = new Font("Segoe UI", 9F);
+            AutoScaleMode = AutoScaleMode.Font;
+            Padding = new Padding(10);
         }
 
         private void CreateControls()
         {
-            // Create main container with padding for better spacing
-            TableLayoutPanel mainLayout = new TableLayoutPanel
+            TableLayoutPanel mainLayout = CreateMainLayout();
+            GroupBox hotkeysGroup = CreateHotkeysGroup();
+            GroupBox generalGroup = CreateGeneralSettingsGroup();
+            TableLayoutPanel buttonPanel = CreateButtonPanel();
+
+            // Add panels to main layout
+            mainLayout.Controls.Add(hotkeysGroup, 0, 0);
+            mainLayout.Controls.Add(generalGroup, 0, 1);
+            mainLayout.Controls.Add(buttonPanel, 0, 2);
+
+            Controls.Add(mainLayout);
+        }
+
+        private TableLayoutPanel CreateMainLayout()
+        {
+            return new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 Padding = new Padding(8),
                 ColumnCount = 1,
                 RowCount = 3,
                 AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                RowStyles = {
+                    new RowStyle(SizeType.Percent, 50F),
+                    new RowStyle(SizeType.Percent, 30F),
+                    new RowStyle(SizeType.Percent, 20F)
+                }
             };
+        }
 
-            // Better row proportions for more visual balance
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 30F));
-            mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+        private GroupBox CreateHotkeysGroup()
+        {
+            var hotkeysGroup = CreateGroupBox("Hotkeys", 14);
+            _hotkeysLayout = CreateHotkeyLayout();
 
-            // Create hotkeys panel with improved styling
-            GroupBox hotkeysGroup = CreateStyledGroupBox("Hotkeys", 14);
+            AddHotkeyControls();
 
-            hotkeysLayout = new TableLayoutPanel
+            hotkeysGroup.Controls.Add(_hotkeysLayout);
+            return hotkeysGroup;
+        }
+
+        private TableLayoutPanel CreateHotkeyLayout()
+        {
+            var layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
@@ -185,24 +139,55 @@ namespace poji
                 }
             };
 
-            // Better spacing between rows
+            // Add row styles
             for (int i = 0; i < 4; i++)
             {
-                hotkeysLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             }
 
-            // Add hotkey controls with proper spacing
-            AddHotkeyControl(hotkeysLayout, "Toggle Visibility", "ToggleVisibility", 0);
-            AddHotkeyControl(hotkeysLayout, "Exit Application", "Exit", 1);
-            AddHotkeyControl(hotkeysLayout, "Reload Crosshair", "ReloadCrosshair", 2);
-            AddHotkeyControl(hotkeysLayout, "Switch Monitor", "SwitchMonitor", 3);
+            return layout;
+        }
 
-            hotkeysGroup.Controls.Add(hotkeysLayout);
+        private void AddHotkeyControls()
+        {
+            AddHotkeyControl(_hotkeysLayout, "Toggle Visibility", TOGGLE_VISIBILITY, 0);
+            AddHotkeyControl(_hotkeysLayout, "Exit Application", EXIT_ACTION, 1);
+            AddHotkeyControl(_hotkeysLayout, "Reload Crosshair", RELOAD_CROSSHAIR, 2);
+            AddHotkeyControl(_hotkeysLayout, "Switch Monitor", SWITCH_MONITOR, 3);
+        }
 
-            // Create general settings panel with improved styling
-            GroupBox generalGroup = CreateStyledGroupBox("General Settings", 14);
+        private GroupBox CreateGeneralSettingsGroup()
+        {
+            var generalGroup = CreateGroupBox("General Settings", 14);
+            var generalLayout = CreateGeneralSettingsLayout();
 
-            TableLayoutPanel generalLayout = new TableLayoutPanel
+            // Scale control
+            var scaleLabel = CreateLabel("Crosshair Scale:");
+            _scaleDropdown = CreateScaleDropdown();
+
+            // Monitor control
+            var monitorLabel = CreateLabel("Display Monitor:");
+            _monitorDropdown = CreateMonitorDropdown();
+
+            // Crosshair code control
+            var crosshairLabel = CreateLabel("Crosshair Code:");
+            var crosshairPanel = CreateCrosshairPanel();
+
+            // Add controls to general layout
+            generalLayout.Controls.Add(scaleLabel, 0, 0);
+            generalLayout.Controls.Add(_scaleDropdown, 1, 0);
+            generalLayout.Controls.Add(monitorLabel, 0, 1);
+            generalLayout.Controls.Add(_monitorDropdown, 1, 1);
+            generalLayout.Controls.Add(crosshairLabel, 0, 2);
+            generalLayout.Controls.Add(crosshairPanel, 1, 2);
+
+            generalGroup.Controls.Add(generalLayout);
+            return generalGroup;
+        }
+
+        private TableLayoutPanel CreateGeneralSettingsLayout()
+        {
+            var layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
@@ -216,17 +201,19 @@ namespace poji
                 }
             };
 
-            // Better spacing between rows
+            // Add row styles with padding
             for (int i = 0; i < 3; i++)
             {
-                generalLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-                generalLayout.SetRowPadding(i, 5);
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.SetRowPadding(i, 5);
             }
 
-            // Scale control with better styling
-            Label scaleLabel = CreateStyledLabel("Crosshair Scale:");
+            return layout;
+        }
 
-            scaleDropdown = new ComboBox
+        private ComboBox CreateScaleDropdown()
+        {
+            var dropdown = new ComboBox
             {
                 Dock = DockStyle.Fill,
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -235,15 +222,22 @@ namespace poji
                 Margin = new Padding(3, 3, 3, 8)
             };
 
-            foreach (float scale in new[] { 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 3.0f })
+            PopulateScaleOptions(dropdown);
+            return dropdown;
+        }
+
+        private void PopulateScaleOptions(ComboBox dropdown)
+        {
+            float[] scaleOptions = { 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 3.0f };
+            foreach (float scale in scaleOptions)
             {
-                scaleDropdown.Items.Add($"{scale}x");
+                dropdown.Items.Add($"{scale}x");
             }
+        }
 
-            // Monitor control with better styling
-            Label monitorLabel = CreateStyledLabel("Display Monitor:");
-
-            monitorDropdown = new ComboBox
+        private ComboBox CreateMonitorDropdown()
+        {
+            return new ComboBox
             {
                 Dock = DockStyle.Fill,
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -251,11 +245,11 @@ namespace poji
                 Tag = "Monitor",
                 Margin = new Padding(3, 3, 3, 8)
             };
+        }
 
-            // Crosshair code control with better styling
-            Label crosshairLabel = CreateStyledLabel("Crosshair Code:");
-
-            TableLayoutPanel crosshairPanel = new TableLayoutPanel
+        private TableLayoutPanel CreateCrosshairPanel()
+        {
+            var panel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
@@ -267,14 +261,14 @@ namespace poji
                 }
             };
 
-            crosshairTextBox = new TextBox
+            _crosshairTextBox = new TextBox
             {
                 Dock = DockStyle.Fill,
                 Name = "crosshairTextBox",
                 Margin = new Padding(3, 3, 3, 8)
             };
 
-            applyButton = new Button
+            _applyButton = new Button
             {
                 Text = "Apply",
                 Dock = DockStyle.Fill,
@@ -282,21 +276,15 @@ namespace poji
                 Padding = new Padding(0, 5, 0, 5)
             };
 
-            crosshairPanel.Controls.Add(crosshairTextBox, 0, 0);
-            crosshairPanel.Controls.Add(applyButton, 1, 0);
+            panel.Controls.Add(_crosshairTextBox, 0, 0);
+            panel.Controls.Add(_applyButton, 1, 0);
 
-            // Add controls to general layout
-            generalLayout.Controls.Add(scaleLabel, 0, 0);
-            generalLayout.Controls.Add(scaleDropdown, 1, 0);
-            generalLayout.Controls.Add(monitorLabel, 0, 1);
-            generalLayout.Controls.Add(monitorDropdown, 1, 1);
-            generalLayout.Controls.Add(crosshairLabel, 0, 2);
-            generalLayout.Controls.Add(crosshairPanel, 1, 2);
+            return panel;
+        }
 
-            generalGroup.Controls.Add(generalLayout);
-
-            // Button panel with improved styling
-            TableLayoutPanel buttonPanel = new TableLayoutPanel
+        private TableLayoutPanel CreateButtonPanel()
+        {
+            var buttonPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 3,
@@ -309,43 +297,29 @@ namespace poji
                 }
             };
 
-            resetButton = new Button
-            {
-                Text = "Reset to Default",
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5),
-                Padding = new Padding(0, 8, 0, 8)
-            };
+            _resetButton = CreateButton("Reset to Default");
+            _saveButton = CreateButton("Save");
+            _cancelButton = CreateButton("Cancel");
 
-            saveButton = new Button
-            {
-                Text = "Save",
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5),
-                Padding = new Padding(0, 8, 0, 8)
-            };
+            buttonPanel.Controls.Add(_resetButton, 0, 0);
+            buttonPanel.Controls.Add(_saveButton, 1, 0);
+            buttonPanel.Controls.Add(_cancelButton, 2, 0);
 
-            cancelButton = new Button
-            {
-                Text = "Cancel",
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5),
-                Padding = new Padding(0, 8, 0, 8)
-            };
-
-            buttonPanel.Controls.Add(resetButton, 0, 0);
-            buttonPanel.Controls.Add(saveButton, 1, 0);
-            buttonPanel.Controls.Add(cancelButton, 2, 0);
-
-            // Add panels to main layout with spacing
-            mainLayout.Controls.Add(hotkeysGroup, 0, 0);
-            mainLayout.Controls.Add(generalGroup, 0, 1);
-            mainLayout.Controls.Add(buttonPanel, 0, 2);
-
-            this.Controls.Add(mainLayout);
+            return buttonPanel;
         }
 
-        private GroupBox CreateStyledGroupBox(string text, float fontSize = 9f)
+        private Button CreateButton(string text)
+        {
+            return new Button
+            {
+                Text = text,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(5),
+                Padding = new Padding(0, 8, 0, 8)
+            };
+        }
+
+        private GroupBox CreateGroupBox(string text, float fontSize = 9f)
         {
             return new GroupBox
             {
@@ -357,7 +331,7 @@ namespace poji
             };
         }
 
-        private Label CreateStyledLabel(string text)
+        private Label CreateLabel(string text)
         {
             return new Label
             {
@@ -368,26 +342,25 @@ namespace poji
             };
         }
 
-        private void SetupEventHandlers()
+        private void RegisterEventHandlers()
         {
-            // Direct event handlers for buttons
-            resetButton.Click += ResetButton_Click;
-            saveButton.Click += SaveButton_Click;
-            cancelButton.Click += CancelButton_Click;
-            applyButton.Click += LoadCrosshairButton_Click;
+            // Button event handlers
+            _resetButton.Click += OnResetButtonClick;
+            _saveButton.Click += OnSaveButtonClick;
+            _cancelButton.Click += OnCancelButtonClick;
+            _applyButton.Click += OnApplyCrosshairButtonClick;
 
-            // Direct event handlers for dropdowns
-            scaleDropdown.SelectedIndexChanged += SettingChanged;
-            monitorDropdown.SelectedIndexChanged += SettingChanged;
+            // Dropdown event handlers
+            _scaleDropdown.SelectedIndexChanged += OnSettingChanged;
+            _monitorDropdown.SelectedIndexChanged += OnSettingChanged;
 
             // Form events
-            this.FormClosing += SettingsForm_FormClosing;
+            FormClosing += OnFormClosing;
         }
 
-        private void SettingsForm_FormClosing(object sender, FormClosingEventArgs e)
+        private void OnFormClosing(object sender, FormClosingEventArgs e)
         {
-            // Check if settings were changed but not saved
-            if (AreSettingsChanged() && DialogResult != DialogResult.OK)
+            if (HasUnsavedChanges() && DialogResult != DialogResult.OK)
             {
                 var result = MessageBox.Show(
                     "You have unsaved changes. Do you want to save them before closing?",
@@ -407,36 +380,55 @@ namespace poji
             }
         }
 
-        private bool AreSettingsChanged()
+        private bool HasUnsavedChanges()
         {
-            // Check if any settings have been changed
-            if (_configManager.CurrentShareCode != crosshairTextBox.Text)
+            if (HasCrosshairCodeChanged() || HasScaleChanged() || HasMonitorChanged())
                 return true;
 
-            string scaleText = scaleDropdown.SelectedItem?.ToString() ?? "1.0x";
-            scaleText = scaleText.Replace("x", "");
-            if (float.TryParse(scaleText, out float scale) && _configManager.CurrentScale != scale)
-                return true;
+            return HaveHotkeyBindingsChanged();
+        }
 
-            if (_configManager.CurrentMonitor != monitorDropdown.SelectedIndex)
-                return true;
+        private bool HasCrosshairCodeChanged()
+        {
+            return _configManager.ShareCode != _crosshairTextBox.Text;
+        }
 
-            // Check hotkeys
-            Dictionary<string, HotkeyBinding> currentBindings = new Dictionary<string, HotkeyBinding>();
+        private bool HasScaleChanged()
+        {
+            if (_scaleDropdown.SelectedItem == null)
+                return false;
+
+            string scaleText = _scaleDropdown.SelectedItem.ToString().Replace("x", "");
+            if (float.TryParse(scaleText, out float scale))
+                return _configManager.Scale != scale;
+
+            return false;
+        }
+
+        private bool HasMonitorChanged()
+        {
+            return _configManager.MonitorIndex != _monitorDropdown.SelectedIndex;
+        }
+
+        private bool HaveHotkeyBindingsChanged()
+        {
             foreach (HotkeyControl hotkeyControl in GetAllHotkeyControls())
             {
                 string actionName = hotkeyControl.Tag.ToString();
-                HotkeyBinding binding = hotkeyControl.GetBinding();
+                HotkeyBinding currentBinding = hotkeyControl.GetBinding();
 
-                // Check if this binding has changed
-                if (_currentBindings.TryGetValue(actionName, out var originalBinding))
+                // Parse the string to enum
+                if (Enum.TryParse<poji.Enums.HotkeyAction>(actionName, out var action))
                 {
-                    if (!AreBindingsEqual(binding, originalBinding))
+                    if (_originalBindings.TryGetValue(action, out var originalBinding))
+                    {
+                        if (!AreBindingsEqual(currentBinding, originalBinding))
+                            return true;
+                    }
+                    else if (currentBinding != null) // New binding
+                    {
                         return true;
-                }
-                else if (binding != null) // New binding
-                {
-                    return true;
+                    }
                 }
             }
 
@@ -453,102 +445,131 @@ namespace poji
             return a.Key == b.Key && a.Alt == b.Alt && a.Shift == b.Shift && a.Ctrl == b.Ctrl;
         }
 
-       
-
         private void LoadSettings()
         {
             try
             {
-                // Load current hotkeys
-                _currentBindings = _configManager.GetHotkeyBindings() ?? new Dictionary<string, HotkeyBinding>();
-
-                // Set values for hotkey controls
-                foreach (HotkeyControl hotkeyControl in GetAllHotkeyControls())
-                {
-                    string actionName = hotkeyControl.Tag.ToString();
-                    if (_currentBindings.TryGetValue(actionName, out HotkeyBinding binding))
-                    {
-                        hotkeyControl.SetBinding(binding);
-                    }
-                }
-
-                // Set scale dropdown
-                string scaleString = $"{_configManager.CurrentScale}x";
-                int scaleIndex = scaleDropdown.Items.IndexOf(scaleString);
-                if (scaleIndex >= 0)
-                {
-                    scaleDropdown.SelectedIndex = scaleIndex;
-                }
-                else
-                {
-                    scaleDropdown.SelectedIndex = 2; // Default to 1.0x
-                }
-
-                // Set crosshair code
-                crosshairTextBox.Text = _configManager.CurrentShareCode;
+                LoadHotkeyBindings();
+                LoadScaleSetting();
+                LoadCrosshairSetting();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading settings: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowErrorMessage("Error loading settings", ex);
             }
         }
 
-        private void LoadMonitorDropdown()
+        private void LoadHotkeyBindings()
+        {
+            // Get all hotkey bindings from the configuration manager
+            _originalBindings = _configManager.GetHotkeyBindings();
+
+            foreach (HotkeyControl hotkeyControl in GetAllHotkeyControls())
+            {
+                string actionName = hotkeyControl.Tag.ToString();
+
+                // Parse the string to enum
+                if (Enum.TryParse<poji.Enums.HotkeyAction>(actionName, out var action) &&
+                    _originalBindings.TryGetValue(action, out HotkeyBinding binding))
+                {
+                    hotkeyControl.SetBinding(binding);
+                }
+            }
+        }
+
+        private void LoadScaleSetting()
+        {
+            string scaleString = $"{_configManager.Scale}x";
+            int scaleIndex = _scaleDropdown.Items.IndexOf(scaleString);
+
+            _scaleDropdown.SelectedIndex = scaleIndex >= 0
+                ? scaleIndex
+                : GetDefaultScaleIndex();
+        }
+
+        private int GetDefaultScaleIndex()
+        {
+            return _scaleDropdown.Items.IndexOf($"{DEFAULT_SCALE}x");
+        }
+
+        private void LoadCrosshairSetting()
+        {
+            _crosshairTextBox.Text = _configManager.ShareCode;
+        }
+
+        private void PopulateMonitorDropdown()
         {
             try
             {
-                monitorDropdown.Items.Clear();
-
-                for (int i = 0; i < Screen.AllScreens.Length; i++)
-                {
-                    var screen = Screen.AllScreens[i];
-                    string primaryIndicator = screen.Primary ? " (Primary)" : "";
-                    monitorDropdown.Items.Add($"Monitor {i + 1}{primaryIndicator} ({screen.Bounds.Width}x{screen.Bounds.Height})");
-                }
-
-                if (monitorDropdown.Items.Count > 0)
-                {
-                    monitorDropdown.SelectedIndex = Math.Min(_configManager.CurrentMonitor, monitorDropdown.Items.Count - 1);
-                }
+                _monitorDropdown.Items.Clear();
+                AddMonitorsToDropdown();
+                SelectCurrentMonitor();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading monitor list: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowErrorMessage("Error loading monitor list", ex);
             }
         }
 
-        private void SettingChanged(object sender, EventArgs e)
+        private void AddMonitorsToDropdown()
+        {
+            for (int i = 0; i < Screen.AllScreens.Length; i++)
+            {
+                var screen = Screen.AllScreens[i];
+                string primaryIndicator = screen.Primary ? " (Primary)" : "";
+                _monitorDropdown.Items.Add($"Monitor {i + 1}{primaryIndicator} ({screen.Bounds.Width}x{screen.Bounds.Height})");
+            }
+        }
+
+        private void SelectCurrentMonitor()
+        {
+            if (_monitorDropdown.Items.Count > 0)
+            {
+                int monitorIndex = Math.Min(_configManager.MonitorIndex, _monitorDropdown.Items.Count - 1);
+                _monitorDropdown.SelectedIndex = monitorIndex;
+            }
+        }
+
+        private void OnSettingChanged(object sender, EventArgs e)
         {
             if (sender is ComboBox comboBox && comboBox.Tag is string settingName)
             {
                 switch (settingName)
                 {
                     case "Scale":
-                        if (comboBox.SelectedItem is string scaleText)
-                        {
-                            scaleText = scaleText.Replace("x", "");
-                            if (float.TryParse(scaleText, out float scale))
-                            {
-                                _configManager.CurrentScale = scale;
-                            }
-                        }
+                        UpdateScaleSetting(comboBox);
                         break;
 
                     case "Monitor":
-                        if (comboBox.SelectedIndex >= 0)
-                        {
-                            _configManager.CurrentMonitor = comboBox.SelectedIndex;
-                        }
+                        UpdateMonitorSetting(comboBox);
                         break;
                 }
             }
         }
 
-        private void LoadCrosshairButton_Click(object sender, EventArgs e)
+        private void UpdateScaleSetting(ComboBox comboBox)
         {
-            string crosshairCode = crosshairTextBox.Text?.Trim() ?? "";
+            if (comboBox.SelectedItem is string scaleText)
+            {
+                scaleText = scaleText.Replace("x", "");
+                if (float.TryParse(scaleText, out float scale))
+                {
+                    _configManager.SaveScale(scale);
+                }
+            }
+        }
+
+        private void UpdateMonitorSetting(ComboBox comboBox)
+        {
+            if (comboBox.SelectedIndex >= 0)
+            {
+                _configManager.SaveMonitorIndex(comboBox.SelectedIndex);
+            }
+        }
+
+        private void OnApplyCrosshairButtonClick(object sender, EventArgs e)
+        {
+            string crosshairCode = _crosshairTextBox.Text?.Trim() ?? "";
 
             if (string.IsNullOrEmpty(crosshairCode))
             {
@@ -559,14 +580,7 @@ namespace poji
 
             try
             {
-                var decoder = new CsgoCrosshairDecoder();
-                var crosshairInfo = decoder.DecodeShareCodeToCrosshairInfo(crosshairCode);
-
-                // If we got this far, the code is valid
-                _configManager.CurrentShareCode = crosshairCode;
-
-                MessageBox.Show("Crosshair code has been validated and will be applied when you save settings.",
-                    "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ValidateAndApplyCrosshairCode(crosshairCode);
             }
             catch (Exception ex)
             {
@@ -575,7 +589,18 @@ namespace poji
             }
         }
 
-        private void SaveButton_Click(object sender, EventArgs e)
+        private void ValidateAndApplyCrosshairCode(string crosshairCode)
+        {
+            var decoder = new CsgoCrosshairDecoder();
+            var crosshairInfo = decoder.DecodeShareCodeToCrosshairInfo(crosshairCode);
+
+            _configManager.SaveShareCode(crosshairCode);
+
+            MessageBox.Show("Crosshair code has been validated and will be applied when you save settings.",
+                "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void OnSaveButtonClick(object sender, EventArgs e)
         {
             SaveSettings();
         }
@@ -584,25 +609,21 @@ namespace poji
         {
             try
             {
-                // Save hotkey bindings
-                Dictionary<string, HotkeyBinding> newBindings = new Dictionary<string, HotkeyBinding>();
+                // Collect the bindings as enum keys
+                Dictionary<poji.Enums.HotkeyAction, HotkeyBinding> enumBindings = CollectHotkeyBindings();
 
-                foreach (HotkeyControl hotkeyControl in GetAllHotkeyControls())
-                {
-                    string actionName = hotkeyControl.Tag.ToString();
-                    HotkeyBinding binding = hotkeyControl.GetBinding();
-                    if (binding != null)
-                    {
-                        newBindings[actionName] = binding;
-                    }
-                }
-
-                // Save settings
-                _configManager.SaveHotkeyBindings(newBindings);
+                // Save these to the config manager
+                _configManager.SaveHotkeyBindings(enumBindings);
                 _configManager.SaveAllSettings();
 
-                // Notify hotkey manager of changes
-                _hotkeyManager.UpdateBindings(newBindings);
+                // Convert to string keys for the hotkey manager
+                Dictionary<string, HotkeyBinding> stringBindings = enumBindings.ToDictionary(
+                    kvp => kvp.Key.ToString(),
+                    kvp => kvp.Value
+                );
+
+                // Update the hotkey manager with string keys
+                _hotkeyManager.UpdateBindings(stringBindings);
 
                 MessageBox.Show("Settings saved successfully.", "Settings Saved",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -612,12 +633,32 @@ namespace poji
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error saving settings: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowErrorMessage("Error saving settings", ex);
             }
         }
 
-        private void ResetButton_Click(object sender, EventArgs e)
+        private Dictionary<poji.Enums.HotkeyAction, HotkeyBinding> CollectHotkeyBindings()
+        {
+            Dictionary<poji.Enums.HotkeyAction, HotkeyBinding> newBindings = new Dictionary<poji.Enums.HotkeyAction, HotkeyBinding>();
+
+            foreach (HotkeyControl hotkeyControl in GetAllHotkeyControls())
+            {
+                string actionName = hotkeyControl.Tag.ToString();
+                HotkeyBinding binding = hotkeyControl.GetBinding();
+                if (binding != null)
+                {
+                    // Parse the string action name to the corresponding enum value
+                    if (Enum.TryParse<poji.Enums.HotkeyAction>(actionName, out var action))
+                    {
+                        newBindings[action] = binding;
+                    }
+                }
+            }
+
+            return newBindings;
+        }
+
+        private void OnResetButtonClick(object sender, EventArgs e)
         {
             if (MessageBox.Show("Are you sure you want to reset all settings to default?",
                 "Confirm Reset", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
@@ -629,15 +670,14 @@ namespace poji
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error resetting settings: {ex.Message}", "Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ShowErrorMessage("Error resetting settings", ex);
                 }
             }
         }
 
         private IEnumerable<HotkeyControl> GetAllHotkeyControls()
         {
-            return hotkeysLayout.Controls.OfType<HotkeyControl>();
+            return _hotkeysLayout.Controls.OfType<HotkeyControl>();
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -651,25 +691,24 @@ namespace poji
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        // Event handler implementations
-        private void HotkeyControl_HotkeyFocusEntered(object sender, EventArgs e)
+        private void OnHotkeyFocusEntered(object sender, EventArgs e)
         {
             _activeHotkeyControl = (HotkeyControl)sender;
         }
 
-        private void HotkeyControl_HotkeyFocusLeft(object sender, EventArgs e)
+        private void OnHotkeyFocusLeft(object sender, EventArgs e)
         {
             _activeHotkeyControl = null;
         }
 
-        private void CancelButton_Click(object sender, EventArgs e)
+        private void OnCancelButtonClick(object sender, EventArgs e)
         {
             Close();
         }
 
         private void AddHotkeyControl(TableLayoutPanel layout, string labelText, string actionName, int row)
         {
-            Label label = CreateStyledLabel(labelText + ":");
+            Label label = CreateLabel(labelText + ":");
 
             HotkeyControl hotkeyControl = new HotkeyControl
             {
@@ -680,11 +719,17 @@ namespace poji
                 Height = 28
             };
 
-            hotkeyControl.HotkeyFocusEntered += HotkeyControl_HotkeyFocusEntered;
-            hotkeyControl.HotkeyFocusLeft += HotkeyControl_HotkeyFocusLeft;
+            hotkeyControl.HotkeyFocusEntered += OnHotkeyFocusEntered;
+            hotkeyControl.HotkeyFocusLeft += OnHotkeyFocusLeft;
 
             layout.Controls.Add(label, 0, row);
             layout.Controls.Add(hotkeyControl, 1, row);
+        }
+
+        private void ShowErrorMessage(string message, Exception ex)
+        {
+            MessageBox.Show($"{message}: {ex.Message}", "Error",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }
