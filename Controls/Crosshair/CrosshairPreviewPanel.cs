@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using poji.Models;
 using poji.Rendering;
+using poji.Utils;
 using Color = System.Drawing.Color;
 
 namespace poji.Controls.Crosshair
@@ -195,7 +196,7 @@ namespace poji.Controls.Crosshair
 
         private bool ValidateCrosshairProperties(CrosshairInfo crosshairInfo)
         {
-            if (crosshairInfo.Length > 100)
+            if (crosshairInfo.Length > 1000)
             {
                 ValidationMessage = "Warning: Crosshair length is very large.";
                 return false;

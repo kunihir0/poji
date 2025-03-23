@@ -1,14 +1,22 @@
-﻿namespace poji.Models
+﻿using System;
+
+namespace poji.Models
 {
     /// <summary>
     /// Represents an RGBA color for a crosshair.
     /// </summary>
     public class Color
     {
+        private byte _alpha;
+
         public byte Red { get; set; }
         public byte Green { get; set; }
         public byte Blue { get; set; }
-        public byte Alpha { get; set; }
+        public byte Alpha
+        {
+            get => _alpha;
+            set => _alpha = Math.Min((byte)255, value);
+        }
 
         public Color(byte red, byte green, byte blue, byte alpha = 255)
         {

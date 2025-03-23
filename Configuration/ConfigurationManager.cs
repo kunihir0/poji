@@ -8,11 +8,13 @@ using poji.Enums;
 using poji.Interfaces;
 using System.Windows.Forms;
 using poji.Services;
+using poji.Utils;
+using poji.Rendering;
 
 namespace poji.Configuration
 {
     /// <summary>
-    /// Manages application configuration settings, including user preferences and hotkey bindings.
+    /// Manages application configuration settings, including user preferences, crosshair settings, and hotkey bindings.
     /// </summary>
     public class ConfigurationManager : IConfigurationManager
     {
@@ -26,6 +28,10 @@ namespace poji.Configuration
             public const float Scale = 1.0f;
             public const int Monitor = 0;
             public const string ShareCode = "CSGO-TpORA-p9Ley-TLQ3P-HzXJY-U9z6A";
+            public const bool SimulateRecoil = false;
+            public const bool ShowDebugText = false;
+            public const CrosshairRenderer.RenderMode RenderMode = CrosshairRenderer.RenderMode.MainOnly;
+            public const byte Alpha = 200;
         }
 
         #region Properties
@@ -33,6 +39,10 @@ namespace poji.Configuration
         public string ShareCode { get; private set; }
         public float Scale { get; private set; }
         public int MonitorIndex { get; private set; }
+        public bool SimulateRecoil { get; private set; }
+        public bool ShowDebugText { get; private set; }
+        public CrosshairRenderer.RenderMode RenderMode { get; private set; }
+        public byte Alpha { get; private set; }
 
         #endregion
 
@@ -66,6 +76,10 @@ namespace poji.Configuration
                 LoadShareCode(document);
                 LoadScale(document);
                 LoadMonitorIndex(document);
+                LoadSimulateRecoil(document);
+                LoadShowDebugText(document);
+                LoadRenderMode(document);
+                LoadAlpha(document);
             }
             catch (Exception ex)
             {
@@ -92,11 +106,39 @@ namespace poji.Configuration
             SaveAllSettings();
         }
 
+        public void SaveSimulateRecoil(bool simulateRecoil)
+        {
+            SimulateRecoil = simulateRecoil;
+            SaveAllSettings();
+        }
+
+        public void SaveShowDebugText(bool showDebugText)
+        {
+            ShowDebugText = showDebugText;
+            SaveAllSettings();
+        }
+
+        public void SaveRenderMode(CrosshairRenderer.RenderMode renderMode)
+        {
+            RenderMode = renderMode;
+            SaveAllSettings();
+        }
+
+        public void SaveAlpha(byte alpha)
+        {
+            Alpha = alpha;
+            SaveAllSettings();
+        }
+
         public void SaveAllSettings()
         {
             try
             {
                 var document = CreateSettingsXmlDocument();
+
+                // Ensure the directory exists before saving
+                EnsureDirectoryExists(Path.GetDirectoryName(_paths.SettingsFile));
+
                 document.Save(_paths.SettingsFile);
             }
             catch (Exception ex)
@@ -131,6 +173,10 @@ namespace poji.Configuration
             try
             {
                 var document = CreateHotkeysXmlDocument(bindings);
+
+                // Ensure the directory exists before saving
+                EnsureDirectoryExists(Path.GetDirectoryName(_paths.HotkeysFile));
+
                 document.Save(_paths.HotkeysFile);
             }
             catch (Exception ex)
@@ -144,6 +190,34 @@ namespace poji.Configuration
             ResetToDefaults();
             SaveHotkeyBindings(CreateDefaultHotkeyBindings());
             SaveAllSettings();
+        }
+
+        public CrosshairInfo GetCrosshairInfo()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(ShareCode))
+                {
+                    var decoder = new CsgoCrosshairDecoder();
+                    var crosshairInfo = decoder.DecodeShareCodeToCrosshairInfo(ShareCode);
+
+                    // Apply saved configuration to the crosshair
+                    if (crosshairInfo != null)
+                    {
+                        crosshairInfo.ShowDebugText = ShowDebugText;
+                        crosshairInfo.Alpha = Alpha;
+                        crosshairInfo.ScaleFactor = Scale;
+                        return crosshairInfo;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError("Error creating crosshair from share code: {0}", ex.Message);
+            }
+
+            // Return default crosshair if we couldn't create one from the share code
+            return new CrosshairInfo();
         }
 
         #endregion
@@ -181,6 +255,10 @@ namespace poji.Configuration
             ShareCode = Defaults.ShareCode;
             Scale = Defaults.Scale;
             MonitorIndex = Defaults.Monitor;
+            SimulateRecoil = Defaults.SimulateRecoil;
+            ShowDebugText = Defaults.ShowDebugText;
+            RenderMode = Defaults.RenderMode;
+            Alpha = Defaults.Alpha;
         }
 
         private void ResetToDefaults()
@@ -188,6 +266,10 @@ namespace poji.Configuration
             ShareCode = Defaults.ShareCode;
             Scale = Defaults.Scale;
             MonitorIndex = Defaults.Monitor;
+            SimulateRecoil = Defaults.SimulateRecoil;
+            ShowDebugText = Defaults.ShowDebugText;
+            RenderMode = Defaults.RenderMode;
+            Alpha = Defaults.Alpha;
         }
 
         private XmlDocument LoadXmlDocument(string path)
@@ -224,6 +306,42 @@ namespace poji.Configuration
             }
         }
 
+        private void LoadSimulateRecoil(XmlDocument document)
+        {
+            var simulateRecoilNode = document.DocumentElement.SelectSingleNode("//SimulateRecoil");
+            if (simulateRecoilNode != null && bool.TryParse(simulateRecoilNode.InnerText, out bool simulateRecoil))
+            {
+                SimulateRecoil = simulateRecoil;
+            }
+        }
+
+        private void LoadShowDebugText(XmlDocument document)
+        {
+            var showDebugTextNode = document.DocumentElement.SelectSingleNode("//ShowDebugText");
+            if (showDebugTextNode != null && bool.TryParse(showDebugTextNode.InnerText, out bool showDebugText))
+            {
+                ShowDebugText = showDebugText;
+            }
+        }
+
+        private void LoadRenderMode(XmlDocument document)
+        {
+            var renderModeNode = document.DocumentElement.SelectSingleNode("//RenderMode");
+            if (renderModeNode != null && Enum.TryParse(renderModeNode.InnerText, out CrosshairRenderer.RenderMode renderMode))
+            {
+                RenderMode = renderMode;
+            }
+        }
+
+        private void LoadAlpha(XmlDocument document)
+        {
+            var alphaNode = document.DocumentElement.SelectSingleNode("//Alpha");
+            if (alphaNode != null && byte.TryParse(alphaNode.InnerText, out byte alpha))
+            {
+                Alpha = alpha;
+            }
+        }
+
         private XmlDocument CreateSettingsXmlDocument()
         {
             var document = new XmlDocument();
@@ -248,6 +366,26 @@ namespace poji.Configuration
             var monitorElement = document.CreateElement("Monitor");
             monitorElement.InnerText = MonitorIndex.ToString();
             root.AppendChild(monitorElement);
+
+            // SimulateRecoil
+            var simulateRecoilElement = document.CreateElement("SimulateRecoil");
+            simulateRecoilElement.InnerText = SimulateRecoil.ToString();
+            root.AppendChild(simulateRecoilElement);
+
+            // ShowDebugText
+            var showDebugTextElement = document.CreateElement("ShowDebugText");
+            showDebugTextElement.InnerText = ShowDebugText.ToString();
+            root.AppendChild(showDebugTextElement);
+
+            // RenderMode
+            var renderModeElement = document.CreateElement("RenderMode");
+            renderModeElement.InnerText = RenderMode.ToString();
+            root.AppendChild(renderModeElement);
+
+            // Alpha
+            var alphaElement = document.CreateElement("Alpha");
+            alphaElement.InnerText = Alpha.ToString();
+            root.AppendChild(alphaElement);
 
             return document;
         }
@@ -322,7 +460,10 @@ namespace poji.Configuration
                 [HotkeyAction.ToggleVisibility] = new HotkeyBinding { Key = Keys.H, Alt = true, Shift = true },
                 [HotkeyAction.Exit] = new HotkeyBinding { Key = Keys.W, Alt = true, Shift = true },
                 [HotkeyAction.ReloadCrosshair] = new HotkeyBinding { Key = Keys.R, Alt = true, Shift = true },
-                [HotkeyAction.SwitchMonitor] = new HotkeyBinding { Key = Keys.D1, Alt = true, Shift = true }
+                [HotkeyAction.SwitchMonitor] = new HotkeyBinding { Key = Keys.D1, Alt = true, Shift = true },
+                [HotkeyAction.ToggleDebugMode] = new HotkeyBinding { Key = Keys.D, Alt = true, Shift = true },
+                [HotkeyAction.ToggleRecoilSimulation] = new HotkeyBinding { Key = Keys.S, Alt = true, Shift = true },
+                [HotkeyAction.CycleRenderMode] = new HotkeyBinding { Key = Keys.M, Alt = true, Shift = true }
             };
         }
 

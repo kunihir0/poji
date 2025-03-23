@@ -11,7 +11,9 @@ using poji.Models.Events;
 using poji.Properties;
 using poji.Rendering;
 using poji.Services.TrayManagement;
+using poji.UI;
 using poji.UI.Dialogs;
+using poji.Utils;
 using Color = System.Drawing.Color;
 
 namespace poji
@@ -77,19 +79,16 @@ namespace poji
 
         private void InitializeTrayManager()
         {
-            // Create tray configuration
             var trayConfig = new TrayIconConfiguration
             {
                 IconText = Resources.TrayIconManager_InitializeTrayIcon_Crosshair_Overlay,
                 AboutText = Resources.TrayIconManager_OnAboutClicked_,
                 AboutTitle = Resources.TrayIconManager_OnAboutClicked_About,
-                // Using the default scale options defined in TrayIconConfiguration constructor
             };
 
-            // Use the factory to create the tray manager
             _trayManager = TrayManagerFactory.CreateTrayManager(this, trayConfig);
 
-            // Connect tray events
+            // Connect existing tray events
             _trayManager.ExitRequested += (s, e) => ExitApplication();
             _trayManager.ToggleVisibilityRequested += (s, e) => ToggleVisibility();
             _trayManager.LoadCrosshairRequested += (s, e) => ShowLoadCrosshairDialog();
@@ -97,7 +96,13 @@ namespace poji
             _trayManager.ScaleChangeRequested += (s, e) => SetScale(e.ScaleFactor);
             _trayManager.SettingsRequested += (s, e) => ShowSettingsDialog();
 
-            // Initialize the tray
+            // Connect new tray events
+            _trayManager.RenderModeChangeRequested += (s, e) => SetRenderMode(e.Mode);
+            _trayManager.ToggleDebugModeRequested += (s, e) => ToggleDebugMode();
+            _trayManager.ShowColorCustomizationRequested += (s, e) => ShowColorCustomizationDialog();
+            _trayManager.OpacityChangeRequested += (s, e) => SetCrosshairOpacity(e.Opacity);
+            _trayManager.ToggleRecoilSimulationRequested += (s, e) => ToggleRecoilSimulation();
+
             _trayManager.Initialize();
         }
 
@@ -158,6 +163,79 @@ namespace poji
 
         #endregion
 
+        #region New Functionality Methods
+
+        private void SetRenderMode(CrosshairRenderer.RenderMode mode)
+        {
+            _crosshairRenderer.Mode = mode;
+            Invalidate();
+        }
+
+        private void ToggleDebugMode()
+        {
+            if (_crosshairRenderer.CrosshairInfo != null)
+            {
+                _crosshairRenderer.CrosshairInfo.ShowDebugText = !_crosshairRenderer.CrosshairInfo.ShowDebugText;
+                Invalidate();
+            }
+        }
+
+        private void ShowColorCustomizationDialog()
+        {
+            SetClickThroughEnabled(false);
+
+            if (_crosshairRenderer.CrosshairInfo != null)
+            {
+                using (var colorDialog = new ColorDialog())
+                {
+                    colorDialog.Color = Color.FromArgb(
+                        _crosshairRenderer.CrosshairInfo.ColorR,
+                        _crosshairRenderer.CrosshairInfo.ColorG,
+                        _crosshairRenderer.CrosshairInfo.ColorB);
+
+                    if (colorDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        _crosshairRenderer.CrosshairInfo.ColorR = colorDialog.Color.R;
+                        _crosshairRenderer.CrosshairInfo.ColorG = colorDialog.Color.G;
+                        _crosshairRenderer.CrosshairInfo.ColorB = colorDialog.Color.B;
+                        Invalidate();
+                    }
+                }
+            }
+
+            SetClickThroughEnabled(true);
+        }
+
+        private void SetCrosshairOpacity(float opacity)
+        {
+            if (_crosshairRenderer.CrosshairInfo != null)
+            {
+                // Convert float (0.0-1.0) to byte (0-255)
+                _crosshairRenderer.CrosshairInfo.Alpha = (byte)(opacity * 255);
+                Invalidate();
+            }
+        }
+
+        private void ToggleRecoilSimulation()
+        {
+            _crosshairRenderer.SimulateRecoil = !_crosshairRenderer.SimulateRecoil;
+            Invalidate();
+        }
+
+        private void CycleRenderMode()
+        {
+            if (_crosshairRenderer != null)
+            {
+                var modes = Enum.GetValues(typeof(CrosshairRenderer.RenderMode));
+                int currentIndex = Array.IndexOf(modes, _crosshairRenderer.Mode);
+                int nextIndex = (currentIndex + 1) % modes.Length;
+                _crosshairRenderer.Mode = (CrosshairRenderer.RenderMode)modes.GetValue(nextIndex);
+                Invalidate();
+            }
+        }
+
+        #endregion
+
         #region Event Handlers
 
         private void HotkeyManager_HotkeyTriggered(object sender, HotkeyEventArgs e)
@@ -182,17 +260,25 @@ namespace poji
                         SwitchToMonitor(e.Data);
                     }
                     break;
+
+                case HotkeyAction.ToggleDebugMode:
+                    ToggleDebugMode();
+                    break;
+
+                case HotkeyAction.ToggleRecoilSimulation:
+                    ToggleRecoilSimulation();
+                    break;
+
+                case HotkeyAction.CycleRenderMode:
+                    CycleRenderMode();
+                    break;
             }
         }
 
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-
-            // Load settings
             LoadSettings();
-
-            // If we don't have a crosshair, prompt the user to enter one
             if (_crosshairRenderer.CrosshairInfo == null)
             {
                 ShowLoadCrosshairDialog();
@@ -202,7 +288,6 @@ namespace poji
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-
             if (!_isVisible) return;
 
             int centerX = Width / 2;
@@ -213,14 +298,12 @@ namespace poji
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            // Only cancel if it's not an explicit exit
             if (e.CloseReason == CloseReason.UserClosing)
             {
                 e.Cancel = true;
                 Hide();
                 return;
             }
-
             base.OnFormClosing(e);
         }
 
@@ -277,19 +360,12 @@ namespace poji
                     string shareCode = inputDialog.InputText;
                     try
                     {
-                        // The crosshair is already validated in the dialog
                         var crosshairInfo = inputDialog.CrosshairInfo;
-
                         if (crosshairInfo != null)
                         {
-                            // Update crosshair renderer with new info
                             _crosshairRenderer.CrosshairInfo = crosshairInfo;
                             _crosshairRenderer.ScaleFactor = _configManager.Scale;
-
-                            // Save to settings
                             _configManager.SaveShareCode(shareCode);
-
-                            // Refresh display
                             Invalidate();
                         }
                     }
@@ -304,44 +380,33 @@ namespace poji
 
         private void ShowSettingsDialog()
         {
-            // Temporarily disable click-through to interact with the dialog
             SetClickThroughEnabled(false);
 
             using (var settingsForm = new SettingsForm(_configManager, _hotkeyManager))
             {
                 if (settingsForm.ShowDialog() == DialogResult.OK)
                 {
-                    // Apply changes immediately
                     LoadSettings();
-
                     var convertedBindings = _configManager.GetHotkeyBindings().ToDictionary(
-                        pair => pair.Key.ToString(),  // Convert enum to string
+                        pair => pair.Key.ToString(),
                         pair => pair.Value
                     );
-
-                    // Update hotkey bindings
                     _hotkeyManager.UpdateBindings(convertedBindings);
                 }
             }
 
-            // Re-enable click-through
             SetClickThroughEnabled(true);
         }
 
         private void LoadSettings()
         {
-            // Load configurations
             _configManager.LoadSettings();
-
-            // Apply monitor setting
             int monitorIndex = _configManager.MonitorIndex;
             if (monitorIndex >= 0 && monitorIndex < Screen.AllScreens.Length)
             {
                 _currentMonitorIndex = monitorIndex;
                 SetFormToScreen(Screen.AllScreens[monitorIndex]);
             }
-
-            // Load crosshair
             LoadCrosshairFromSettings();
         }
 

@@ -72,19 +72,30 @@ namespace poji.Models
         public CrosshairInfo()
         {
             // Default to a simple green crosshair
-            Size = 5;
-            Gap = 2;
-            Thickness = 1;
-            Outline = 0;
+            Style = CrosshairStyle.Classic;
+            FollowRecoil = true;
+            HasCenterDot = false;
+            Length = 3.9f;
+            Thickness = 0.6f;
+            Gap = -2.2f;
+            HasOutline = true;
+            Outline = 1.0f;
+            Color = new Color(0, 255, 0, 200);
+            HasAlpha = true;
+            SplitDistance = 3;
+            InnerSplitAlpha = 0.0f;
+            OuterSplitAlpha = 1.0f;
+            SplitSizeRatio = 1.0f;
+            IsTStyle = false;
+            DeployedWeaponGapEnabled = true;
+            FixedCrosshairGap = 3.0f;
 
-            Color = new Color(0, 255, 0, 255);
-
-            Dot = true;
+            // Map simple properties
+            Size = Length;
+            Dot = HasCenterDot;
             DotOnly = false;
-            T = true;
+            T = IsTStyle;
             ShowDebugText = false;
-
-            Length = Size;
         }
 
         /// <summary>
@@ -105,53 +116,65 @@ namespace poji.Models
 
         private void ValidateBytes(byte[] bytes)
         {
-            if (bytes.Length < 15)
+            if (bytes.Length < 16)
             {
-                throw new ArgumentException("Not enough bytes to decode CrosshairInfo (need at least 15)");
+                throw new ArgumentException("Not enough bytes to decode CrosshairInfo (need at least 16)");
             }
         }
 
         private void DecodeFromBytes(byte[] bytes)
         {
-            // Decode properties to match Python implementation
-            Gap = CrosshairUtils.Uint8ToInt8(bytes[3]) / 10.0f;
-            Outline = bytes[4] / 2.0f;
-            Color = new Color(bytes[5], bytes[6], bytes[7], bytes[8]);
-
-            SplitDistance = (int)bytes[9];
-            FollowRecoil = ((bytes[9] >> 7) & 1) == 1;
-
-            FixedCrosshairGap = CrosshairUtils.Uint8ToInt8(bytes[10]) / 10.0f;
-
-            ColorIndex = bytes[11] & 7;
-            HasOutline = ((bytes[11] >> 3) & 1) == 1;
-            InnerSplitAlpha = ((bytes[11] >> 4) & 0xF) / 10.0f;
-
-            OuterSplitAlpha = (bytes[12] & 0xF) / 10.0f;
-            SplitSizeRatio = ((bytes[12] >> 4) & 0xF) / 10.0f;
-
-            Thickness = bytes[13] / 10.0f;
-
-            // Decode flags from bytes[14]
-            HasCenterDot = ((bytes[14] >> 4) & 1) == 1;
-            DeployedWeaponGapEnabled = ((bytes[14] >> 5) & 1) == 1;
-            HasAlpha = ((bytes[14] >> 6) & 1) == 1;
-            IsTStyle = ((bytes[14] >> 7) & 1) == 1;
-
-            // Style from lower nibble of bytes[14]
-            Style = (CrosshairStyle)((bytes[14] & 0xF) >> 1);
-
-            // Length (and Size)
-            Length = bytes[15] / 10.0f;
-            Size = Length;
-
+            // Decode gap from byte 2
+            Gap = CrosshairUtils.Uint8ToInt8(bytes[2]) / 10.0f;
+            
+            // Decode outline from byte 3
+            Outline = bytes[3] / 2.0f;
+            
+            // Decode color from bytes 4-7
+            Color = new Color(bytes[4], bytes[5], bytes[6], bytes[7]);
+            
+            // Decode split distance and follow recoil from byte 8
+            SplitDistance = bytes[8] & 127;
+            FollowRecoil = ((bytes[8] >> 7) & 1) == 1;
+            
+            // Decode fixed crosshair gap from byte 9
+            FixedCrosshairGap = CrosshairUtils.Uint8ToInt8(bytes[9]) / 10.0f;
+            
+            // Decode color index, outline enabled, and inner split alpha from byte 10
+            ColorIndex = bytes[10] & 7;
+            HasOutline = ((bytes[10] >> 3) & 1) == 1;
+            InnerSplitAlpha = Math.Min(1.0f, ((bytes[10] >> 4) & 0xF) / 10.0f);
+            
+            // Decode outer split alpha and split size ratio from byte 11
+            OuterSplitAlpha = Math.Min(1.0f, (bytes[11] & 0xF) / 10.0f);
+            SplitSizeRatio = Math.Min(1.0f, ((bytes[11] >> 4) & 0xF) / 10.0f);
+            
+            // Decode thickness from byte 12
+            Thickness = (bytes[12] & 63) / 10.0f;
+            
+            // Decode flags from byte 13
+            Style = (CrosshairStyle)((bytes[13] & 0xF) >> 1);
+            HasCenterDot = ((bytes[13] >> 4) & 1) == 1;
+            DeployedWeaponGapEnabled = ((bytes[13] >> 5) & 1) == 1;
+            HasAlpha = ((bytes[13] >> 6) & 1) == 1;
+            IsTStyle = ((bytes[13] >> 7) & 1) == 1;
+            
+            // Decode length from bytes 14-15
+            int temp = bytes[15] & 31;
+            Length = ((temp << 8) | bytes[14]) / 10.0f;
+            
             // Apply default colors if a preset color is selected
             if (ColorIndex != 5)
             {
+                if (ColorIndex < 0 || ColorIndex >= 5)
+                {
+                    ColorIndex = 1; // Default to green if out of range
+                }
                 Color.ApplyDefaultColors(ColorIndex);
             }
 
             // Map additional simple properties
+            Size = Length;
             Dot = HasCenterDot;
             DotOnly = false;
             T = IsTStyle;

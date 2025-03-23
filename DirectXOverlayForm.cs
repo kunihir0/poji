@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Diagnostics;
-using System.Threading;
 using System.IO;
 using poji.Models;
 using Color = System.Drawing.Color;

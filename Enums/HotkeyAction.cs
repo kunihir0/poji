@@ -23,6 +23,21 @@
         /// <summary>
         /// Switch to a different monitor.
         /// </summary>
-        SwitchMonitor
+        SwitchMonitor,
+
+        /// <summary>
+        /// Toggle debug mode.
+        /// </summary>
+        ToggleDebugMode,
+
+        /// <summary>
+        /// Toggle recoil simulation.
+        /// </summary>
+        ToggleRecoilSimulation,
+
+        /// <summary>
+        /// Cycle through different render modes.
+        /// </summary>
+        CycleRenderMode
     }
 }

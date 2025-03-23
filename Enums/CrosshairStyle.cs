@@ -6,7 +6,7 @@
     public enum CrosshairStyle
     {
         Default,
-        DefaultStatic,
+        Static,
         Classic,
         ClassicDynamic,
         ClassicStatic

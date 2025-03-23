@@ -8,13 +8,20 @@ namespace poji.Interfaces
     /// </summary>
     public interface ITrayManager : IDisposable
     {
-        // Events
+        // Existing events
         event EventHandler ExitRequested;
         event EventHandler ToggleVisibilityRequested;
         event EventHandler LoadCrosshairRequested;
         event EventHandler<MonitorChangeEventArgs> MonitorChangeRequested;
         event EventHandler<ScaleChangeEventArgs> ScaleChangeRequested;
         event EventHandler SettingsRequested;
+
+        // New events for MainForm functionality
+        event EventHandler<RenderModeChangeEventArgs> RenderModeChangeRequested;
+        event EventHandler ToggleDebugModeRequested;
+        event EventHandler ShowColorCustomizationRequested;
+        event EventHandler<OpacityChangeEventArgs> OpacityChangeRequested;
+        event EventHandler ToggleRecoilSimulationRequested;
 
         // Methods
         void Initialize();
