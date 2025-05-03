@@ -1,3 +1,8 @@
+## Warning box
+
+| :exclamation:  GOT BANNED FOR THE INJECTOR LMAOOO I FORGOT   |
+|----------------------------------------------|
+
 # 🎮 poji-pojji – Crosshair with Share Code Magic ✨  
 
 Your friendly crosshair companion! **poji-pojji** lets you tweak, share, and switch crosshairs effortlessly. Perfect for CSGO players who want precision *and* style—now with **crosshair share code support**!  
